@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+from uncertainty import add_uncertainty
 
 
 class Hits:
@@ -27,6 +28,8 @@ class Hits:
 
         if self.n_entries == 0:
             raise ValueError("No particles hits on any detector!")
+
+        self.hits_dict = {}
 
     def getBothDetHits(self):
         """
@@ -94,7 +97,9 @@ class Hits:
             "Energy2": energies2,
         }
 
-        return hits_dict
+        self.hits_dict = hits_dict
+
+        print("processed detector hits")
 
     def getDetHits(self):
         """
@@ -122,8 +127,42 @@ class Hits:
 
         hits_dict = {"Position": hits_pos, "Energy": energies}
 
-        return hits_dict
+        self.hits_dict = hits_dict
 
+        print("processed detector hits")
 
-myhits = Hits("/home/rileyannereid/workspace/geant4/data/hits.csv")
-print(myhits.getBothDetHits())
+    def update_pos_uncertainty(self, dist_type, dist_param):
+        """
+        update positions to include uncertainty to detector hits
+
+        :param dist_type: string, "Gaussian" or "Poission" or "Uniform"
+        :param dist_param: float, determined by dist_type, in milimeters
+            if "Gaussian" standard deviation
+            if "Poission" 1/lambda
+            if "Uniform" bounds for uniform
+
+        :return:
+        """
+
+        if len(self.hits_dict.keys()) > 2:
+            # contains two positions entries
+            pos1 = self.hits_dict["Position1"]
+            pos2 = self.hits_dict["Position2"]
+
+            unc_pos1 = [add_uncertainty(pos, dist_type, dist_param) for pos in pos1]
+            unc_pos2 = [add_uncertainty(pos, dist_type, dist_param) for pos in pos2]
+
+            # update entries
+            self.hits_dict["Position1"] = unc_pos1
+            self.hits_dict["Position2"] = unc_pos2
+
+        else:
+            # contains one position entry
+            pos_p = self.hits_dict["Position"]
+
+            unc_pos = [add_uncertainty(pos, dist_type, dist_param) for pos in pos_p]
+
+            # unpdate entry
+            self.hits_dict["Position"] = unc_pos
+
+        return
