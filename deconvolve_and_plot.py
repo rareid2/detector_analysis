@@ -4,21 +4,20 @@ import pandas as pd
 import scipy.stats
 from scipy.signal import convolve2d as conv2
 from scipy.fft import fft2, ifft
-from skimage.transform import resize
 from scipy.ndimage import zoom
 import scipy.signal
 import matplotlib.pyplot as plt
 import random
 import gc
 
-# function for reading hits
-from fnc_get_det1_hits import getDet1Hits
+from hits import Hits
+
 
 # function for decoding matrix
 import sys
 
 # insert at 1, 0 is the script path (or '' in REPL)
-sys.path.insert(1, "/home/rileyannereid/workspace/geant4/CA_designs")
+sys.path.insert(1, "/home/rileyannereid/workspace/geant4/coded_aperture_mask_designs")
 from util_fncs import makeMURA, make_mosaic_MURA, get_decoder_MURA
 
 # plotting
@@ -33,7 +32,7 @@ import matplotlib.colors as colors
 
 
 def plot_step(signal, vmax, fname, label):
-    plt.imshow(signal.T, origin="lower", cmap="turbo", vmax=vmax)
+    plt.imshow(signal.T, origin="lower", cmap="RdBu_r", vmax=vmax)
     plt.colorbar(label=label)
     # plt.xlim([40,55])
     # plt.ylim([40,55])
@@ -48,14 +47,14 @@ def plot_peak(signal, fname, condition):
     x_ax = np.arange(0, len(signal))
 
     # plot the signal
-    plt.plot(signal)
+    plt.plot(signal, color="#34C0D2")
 
     # plot local mins and maxes
     b = (np.diff(np.sign(np.diff(signal))) > 0).nonzero()[0] + 1
     c = (np.diff(np.sign(np.diff(signal))) < 0).nonzero()[0] + 1
 
-    plt.scatter(x_ax[b], signal[b], color="b")
-    plt.scatter(x_ax[c], signal[c], color="r")
+    #plt.scatter(x_ax[b], signal[b], color="b")
+    #plt.scatter(x_ax[c], signal[c], color="r")
 
     # define conditions for half and quarter separated
     half_val = (np.max(signal) - np.mean(signal[0 : len(signal) // 4])) // 2
@@ -64,12 +63,10 @@ def plot_peak(signal, fname, condition):
     quarter_val = 3 * quarter_val + np.mean(signal[0 : len(signal) // 4])
 
     # plot them
-    plt.hlines(
-        half_val, xmin=0, xmax=len(signal), linestyles="--", colors="lightsalmon"
-    )
-    plt.hlines(
-        quarter_val, xmin=0, xmax=len(signal), linestyles="--", colors="lightsalmon"
-    )
+    plt.hlines(half_val, xmin=0, xmax=len(signal), linestyles="--", colors="#FF3A79")
+    # plt.hlines(
+    #    quarter_val, xmin=0, xmax=len(signal), linestyles="--", colors="#FF3A79"
+    # )
 
     # find the height of the two peaks (if there are two peaks)
     local_maxes = signal[c]
@@ -104,7 +101,7 @@ def plot_peak(signal, fname, condition):
 
     fname = fname + ".png"
 
-    plt.savefig(fname, bbox_inches="tight")
+    plt.savefig(fname, bbox_inches="tight", transparent=False, dpi=500)
     plt.close()
     plt.clf()
 
@@ -171,7 +168,7 @@ def dec_plt(fname, uncertainty, nElements, boxdim, ff, ms):
 
     abs_path = "/home/rileyannereid/workspace/geant4/EPAD_geant4"
 
-    fname_save = "results/parameter_sweeps/" + ff
+    fname_save = "/home/rileyannereid/workspace/geant4/results/parameter_sweeps/" + ff
 
     # needs to be set for decoding
     if nElements == 67 or nElements == 31:
@@ -185,10 +182,19 @@ def dec_plt(fname, uncertainty, nElements, boxdim, ff, ms):
     fname_path = os.path.join(abs_path, fname)
 
     # first get the x and y displacement in cm
-    posX, posY, energies = getDet1Hits(fname_path)
+    # posX, posY, energies = getDet1Hits(fname_path)
+    myhits = Hits(fname_path)
+    myhits.getDetHits()
+    Pos = myhits.hits_dict["Position"]
+    posX = [p[0] for p in Pos]
+    posY = [p[1] for p in Pos]
+
+    energies = myhits.hits_dict["Energy"]
 
     energy_limit_kev = 1
     low_energy_electrons = 0
+
+    print(len(posX))
 
     # remove the outer
     if nElements == 61:
@@ -325,7 +331,9 @@ def dec_plt(fname, uncertainty, nElements, boxdim, ff, ms):
     if np.shape(max_col)[0] > 1:
         max_col = max_col[0]
 
-    # resolution = plot_peak(np.fliplr(result_image)[:,int(max_col)],fname_save,condition='half_val')
+    resolution = plot_peak(
+        np.fliplr(result_image)[:, int(max_col)], fname_save, condition="half_val"
+    )
     # for diagonal
     # resolution = plot_peak(np.diagonal(np.fliplr(result_image)),fname_save,condition='half_val')
 
@@ -344,4 +352,6 @@ def dec_plt(fname, uncertainty, nElements, boxdim, ff, ms):
     return snr, resolution
 
 
-dec_plt("data/hits.csv", 0, 67, 0.66, "testing_perp", 87.78)
+dec_plt(
+    "../data/mosaic_sim16/hits_67_3300_6_1.0_28.071.csv", 0, 67, 0.66, "poster", 87.78
+)
