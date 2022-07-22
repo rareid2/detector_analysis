@@ -11,13 +11,13 @@ import random
 import gc
 
 from hits import Hits
-
+from simulation_engine import SimulationEngine
 
 # function for decoding matrix
 import sys
 
 # insert at 1, 0 is the script path (or '' in REPL)
-sys.path.insert(1, "/home/rileyannereid/workspace/geant4/coded_aperture_mask_designs")
+sys.path.insert(1, "/Users/rileyannereid/macworkspace/coded_aperture_mask_designs")
 from util_fncs import makeMURA, make_mosaic_MURA, get_decoder_MURA
 
 # plotting
@@ -53,8 +53,8 @@ def plot_peak(signal, fname, condition):
     b = (np.diff(np.sign(np.diff(signal))) > 0).nonzero()[0] + 1
     c = (np.diff(np.sign(np.diff(signal))) < 0).nonzero()[0] + 1
 
-    #plt.scatter(x_ax[b], signal[b], color="b")
-    #plt.scatter(x_ax[c], signal[c], color="r")
+    # plt.scatter(x_ax[b], signal[b], color="b")
+    # plt.scatter(x_ax[c], signal[c], color="r")
 
     # define conditions for half and quarter separated
     half_val = (np.max(signal) - np.mean(signal[0 : len(signal) // 4])) // 2
@@ -166,9 +166,9 @@ def fft_conv(rawIm, Dec):
 
 def dec_plt(fname, uncertainty, nElements, boxdim, ff, ms):
 
-    abs_path = "/home/rileyannereid/workspace/geant4/EPAD_geant4"
+    abs_path = "/Users/rileyannereid/macworkspace/detector_analysis"
 
-    fname_save = "/home/rileyannereid/workspace/geant4/results/parameter_sweeps/" + ff
+    fname_save = "/Users/rileyannereid/macworkspace/detector_analysis/" + ff
 
     # needs to be set for decoding
     if nElements == 67 or nElements == 31:
@@ -180,14 +180,23 @@ def dec_plt(fname, uncertainty, nElements, boxdim, ff, ms):
     xxes = []
     yxes = []
     fname_path = os.path.join(abs_path, fname)
+    print(fname_path)
 
     # first get the x and y displacement in cm
     # posX, posY, energies = getDet1Hits(fname_path)
-    myhits = Hits(fname_path)
+    simulation_engine = SimulationEngine(sim_type="ca-pt-source", write_files=False)
+    simulation_engine.set_config(
+        det1_thickness_um=140, det_gap_mm=30, win_thickness_um=100, det_size_cm=6.3
+    )
+
+    simulation_engine.set_macro(n_particles=100000, energy_keV=1000)
+    myhits = Hits(simulation_engine, fname_path)
     myhits.getDetHits()
+
     Pos = myhits.hits_dict["Position"]
     posX = [p[0] for p in Pos]
     posY = [p[1] for p in Pos]
+    # print(posY)
 
     energies = myhits.hits_dict["Energy"]
 
@@ -266,6 +275,7 @@ def dec_plt(fname, uncertainty, nElements, boxdim, ff, ms):
     # plt.close()
     # ------------------------------- ------------------------------- ------------------------------- -------------------------------
     heatmap, xedges, yedges = np.histogram2d(xxes, yxes, bins=multiplier * nElements)
+    print(multiplier, nElements)
 
     fname_step = fname_save + "_raw.png"
     plot_step(heatmap, np.amax(heatmap), fname_step, label="# particles")
@@ -352,6 +362,11 @@ def dec_plt(fname, uncertainty, nElements, boxdim, ff, ms):
     return snr, resolution
 
 
-dec_plt(
-    "../data/mosaic_sim16/hits_67_3300_6_1.0_28.071.csv", 0, 67, 0.66, "poster", 87.78
-)
+dec_plt("hits_67_3300_6_1.0_28.071.csv", 0, 67, 0.66, "poster", 87.78)
+
+
+# go through each deconvolution step
+# make into a function
+# add plotting for each step just like this
+# plot step
+# then create a full deconvolve function

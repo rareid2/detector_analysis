@@ -1,19 +1,24 @@
 # class to process hits and find
 from hits import Hits
 from simulation_engine import SimulationEngine
+
 import numpy as np
+import scipy.stats
+import matplotlib.pyplot as plt
 
-import plotly.figure_factory as ff
-import plotly.io as pio
-
-pio.renderers.default = 'browser'
 
 class Scattering:
-    def __init__(self, hits: Hits, simulation_engine: SimulationEngine):
+    def __init__(
+        self,
+        hits: Hits,
+        simulation_engine: SimulationEngine,
+        save_fig_directory="../results/two_detector_config/",
+    ):
         self.hits_dict = hits.hits_dict
         self.energy_keV = simulation_engine.energy_keV
         self.det1_thickness_um = simulation_engine.det1_thickness_um
         self.gap_in_cm = simulation_engine.det_gap_mm / 10
+        self.save_fig_directory = save_fig_directory
 
     def get_thetas(self):
         # if no hits on both detectors, exit
@@ -102,84 +107,93 @@ class Scattering:
         self.sigma_deg_theoretical = sigma_deg_theoretical
         return self.sigma_deg_theoretical
 
-    def plot_theoretical(self, bin_size=5):
+    def plot_theoretical(self, save_fig=True):
 
         print("creating figure")
 
         # sample from normal distribution using the theoretical sigma
         n = 10000
-        th_values = np.random.normal(0, self.sigma_deg_theoretical, n)
-
-        # ground data with the actual simulated sigma
-        hist_data = [th_values]
-
-        group_labels = ["theoretical"]
-
-        # Create distplot with custom bin_size
-        colors = ["rgb(0, 0, 100)"]
-        fig = ff.create_distplot(
-            hist_data, group_labels, bin_size=bin_size, colors=colors, show_hist=False
+        mu = 0
+        x = np.linspace(
+            mu - 3 * self.sigma_deg_theoretical, mu + 3 * self.sigma_deg_theoretical, n
         )
 
-        fig.update_layout(
-            title_text="theoretical distribution <br><sup> energy = %d keV, thickness = %d um of %s </sup>"
-            % (self.energy_keV, self.det1_thickness_um, self.material),
-            legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
+        fig = plt.figure()
+        cc = "#34C0D2"
+
+        plt.plot(
+            x,
+            scipy.stats.norm.pdf(x, mu, self.sigma_deg_theoretical),
+            color=cc,
+            label="theoretical scattering dist",
+        )
+        plt.fill_between(
+            x,
+            scipy.stats.norm.pdf(x, mu, self.sigma_deg_theoretical),
+            color=cc,
+            alpha=0.5,
         )
 
-        fig.update_xaxes(title_text="scattering angle [deg]")
-        # move the legend
+        plt.xlabel("scattering angle [deg]")
+        plt.legend()
 
-        fig.write_html(
-            "../results/two_detector_config/th_scattering_%dkeV_%dum_%s.html"
-            % (self.energy_keV, self.det1_thickness_um, self.material)
-        )
-        fig.write_image(
-            "../results/two_detector_config/th_scattering_%dkeV_%dum_%s.png"
-            % (self.energy_keV, self.det1_thickness_um, self.material), scale=3
-        )
-        fig.show()
+        if save_fig:
+            fig.savefig(
+                "%sth_scattering_%dkeV_%dum_%s.png"
+                % (
+                    self.save_fig_directory,
+                    self.energy_keV,
+                    self.det1_thickness_um,
+                    self.material,
+                ),
+                transparent=True,
+                dpi=500,
+            )
+        plt.show()
 
         # small difference because of the window!
 
-    def plot_compare_th_sim(self, bin_size=5):
+    def plot_compare_th_sim(self, save_fig=True):
 
         print("creating figure")
 
         # sample from normal distribution using the theoretical sigma
-        # cut off at n to help with plotting issues
-        n = 1000
-        th_values = np.random.normal(0, self.sigma_deg_theoretical, n)
-
-        # ground data with the actual simulated sigma
-        hist_data = [th_values, self.thetas_deg[:n]]
-
-        group_labels = ["theoretical", "geant simulation"]
-
-        # Create distplot with custom bin_size
-
-        colors = ["rgb(0, 0, 100)", "rgb(0, 200, 200)"]
-        fig = ff.create_distplot(
-            hist_data,
-            group_labels,
-            bin_size=bin_size,
-            colors=colors,
-            show_hist=[False, True],
+        n = 10000
+        mu = 0
+        x = np.linspace(
+            mu - 3 * self.sigma_deg_theoretical, mu + 3 * self.sigma_deg_theoretical, n
         )
 
-        fig.update_layout(
-            title_text="comparing theoretical and simulated distributions <br><sup> energy = %d keV, thickness = %d um of %s </sup>"
-            % (self.energy_keV, self.det1_thickness_um, self.material),
-            legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
-        )
-        fig.update_xaxes(title_text="scattering angle [deg]")
+        fig = plt.figure()
+        cc = ["#34C0D2", "#7F7F7F"]
 
-        fig.write_html(
-            "../results/two_detector_config/th_sim_scattering_%dkeV_%dum_%s.html"
-            % (self.energy_keV, self.det1_thickness_um, self.material)
+        plt.plot(
+            x,
+            scipy.stats.norm.pdf(x, mu, self.sigma_deg_theoretical),
+            color=cc[0],
+            label="theoretical",
         )
-        fig.write_image(
-            "../results/two_detector_config/th_sim_scattering_%dkeV_%dum_%s.png"
-            % (self.energy_keV, self.det1_thickness_um, self.material), scale=3
+        plt.fill_between(
+            x,
+            scipy.stats.norm.pdf(x, mu, self.sigma_deg_theoretical),
+            color=cc[0],
+            alpha=0.5,
         )
-        fig.show()
+        plt.hist(self.thetas_deg, label="geant simulation", color=cc[1])
+
+        plt.xlabel("scattering angle [deg]")
+        plt.legend()
+
+        if save_fig:
+            fig.savefig(
+                "%scompare_th_scattering_%dkeV_%dum_%s.png"
+                % (
+                    self.save_fig_directory,
+                    self.energy_keV,
+                    self.det1_thickness_um,
+                    self.material,
+                ),
+                transparent=True,
+                dpi=500,
+            )
+        plt.show()

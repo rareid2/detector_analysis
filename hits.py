@@ -1,10 +1,14 @@
 import pandas as pd
 import numpy as np
 from uncertainty import add_uncertainty
+from simulation_engine import SimulationEngine
+
+
+# TODO: change comment formatting
 
 
 class Hits:
-    def __init__(self, fname):
+    def __init__(self, simulation_engine: SimulationEngine, fname):
         # filename with hits
         self.fname = fname
 
@@ -30,6 +34,9 @@ class Hits:
             raise ValueError("No particles hits on any detector!")
 
         self.hits_dict = {}
+
+        # get detector size if needed for uncertainty
+        self.det_size_cm = simulation_engine.det_size_cm
 
     def getBothDetHits(self):
         """
@@ -62,7 +69,7 @@ class Hits:
                     self.detector_hits["x"][count + 1]
                     self.detector_hits["y"][count + 1]
 
-                except KeyError:
+                except:
                     count = count + 1
                     if count == self.n_entries:
                         break
@@ -149,8 +156,14 @@ class Hits:
             pos1 = self.hits_dict["Position1"]
             pos2 = self.hits_dict["Position2"]
 
-            unc_pos1 = [add_uncertainty(pos, dist_type, dist_param) for pos in pos1]
-            unc_pos2 = [add_uncertainty(pos, dist_type, dist_param) for pos in pos2]
+            unc_pos1 = [
+                add_uncertainty(pos, dist_type, dist_param, self.det_size_cm)
+                for pos in pos1
+            ]
+            unc_pos2 = [
+                add_uncertainty(pos, dist_type, dist_param, self.det_size_cm)
+                for pos in pos2
+            ]
 
             # update entries
             self.hits_dict["Position1"] = unc_pos1
@@ -160,7 +173,10 @@ class Hits:
             # contains one position entry
             pos_p = self.hits_dict["Position"]
 
-            unc_pos = [add_uncertainty(pos, dist_type, dist_param) for pos in pos_p]
+            unc_pos = [
+                add_uncertainty(pos, dist_type, dist_param, self.det_size_cm)
+                for pos in pos_p
+            ]
 
             # unpdate entry
             self.hits_dict["Position"] = unc_pos
