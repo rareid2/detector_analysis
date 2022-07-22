@@ -23,4 +23,5 @@ myhits.getDetHits()
 # could put in a loop of energies and thicknesses and just save result - easy
 
 deconvolution = Deconvolution(myhits, simulation_engine)
-deconvolution.plot_heatmap(multiplier=12)
+resolved = deconvolution.deconvolve(multiplier=12,plot_raw_heatmap=True,plot_deconvolved_heatmap=True,plot_signal_peak=True,plot_conditions=True,condition='quarter_val')
+print(resolved)
