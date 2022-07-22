@@ -3,16 +3,23 @@
 # run_pt_src.mac (ca-pt-src)
 # run_angle_beam.mac (two-detectors)
 
-
-# TODO: error handling, better string formatting
-
 import os
 import numpy as np
+from simulation_engine import EPAD_dir
 
-macro_directory = "../EPAD_geant4/macros/"
+macro_directory = EPAD_dir + "/macros"
 
 
-def write_angle_beam_macro(n_particles: int, energy_keV: float):
+def write_angle_beam_macro(n_particles: int, energy_keV: float) -> None:
+    """
+    create macro file for a particle beam at an angle off the y-axis
+
+    params:
+        n_particles: number of particles to run
+        energy_keV:  energy to run the beam at in keV
+    returns:
+    """
+
     mf = "run_angle_beam.mac"
     macro_path = os.path.join(macro_directory, mf)
     with open(macro_path, "w") as f:
@@ -26,13 +33,15 @@ def write_angle_beam_macro(n_particles: int, energy_keV: float):
         f.write("/gps/particle e- \n")
         f.write("/gps/position 0 0 -500 cm \n")
         f.write("/gps/pos/type Point \n")
+        # direction is toward center of detector
         f.write("/gps/direction 0 0 1 \n")
         f.write("/gps/energy " + str(energy_keV) + " keV \n")
 
         f.write("/run/beamOn " + str(n_particles) + " \n")
     f.close()
     print("wrote ", macro_path)
-    return mf
+
+    return
 
 
 def write_pt_macro(
@@ -41,9 +50,20 @@ def write_pt_macro(
     rotations: list,
     energies_keV: list,
     world_size: float,
-):
+) -> None:
+    """
+    create macro file for a point source (or multiple point sources)
+
+    params:
+        n_particles:  number of particles to run
+        positions:    list of positions to initalize pt sources
+        rotations:    list of whether or not pt source needs rotation 0 = no, 1 = yes
+        energies_keV: list of energies to run point soures at in keV
+    returns:
+    """
+
     mf = "run_pt_src.mac"
-    macro_path = os.path.join(macro_directory,mf)
+    macro_path = os.path.join(macro_directory, mf)
 
     with open(macro_path, "w") as f:
         f.write("/run/numberOfThreads 40 \n")
@@ -61,6 +81,7 @@ def write_pt_macro(
             f.write("/gps/pos/shape Circle \n")
             f.write("/gps/pos/centre " + pos_string + " cm \n")
 
+            # if rotation = 1 calculate direction required to point source at center of detector
             if rot != 0:
 
                 detector_loc = np.array([0, 0, world_size * 0.45])
@@ -70,6 +91,7 @@ def write_pt_macro(
 
                 z_ax = np.array([0, 0, 1])
 
+                # found on a reddit forum to get geant to cooperate
                 xprime = np.cross(normal, z_ax)
                 xprime_normd = xprime / np.linalg.norm(xprime)
                 yprime = np.cross(normal, xprime_normd)
@@ -104,10 +126,21 @@ def write_pt_macro(
 
     f.close()
     print("wrote ", macro_path)
-    return mf
+
+    return
 
 
-def write_PAD_macro(n_particles: int, PAD_run: int, folding_energy_keV: float):
+def write_PAD_macro(n_particles: int, PAD_run: int, folding_energy_keV: float) -> None:
+    """
+    create macro file for a pitch angle distribution
+
+    params:
+        n_particles:        number of particles to run
+        PAD_run:            0 = 90 deg, 1 = sin, 2 = sin^2, 3 = triangle
+        folding_energy_keV: folding energy of exponential distribution (main energy) in keV
+    returns:
+    """
+
     mf = "run_PAD.mac"
     macro_path = os.path.join(macro_directory, mf)
 
@@ -125,4 +158,22 @@ def write_PAD_macro(n_particles: int, PAD_run: int, folding_energy_keV: float):
         f.write("/run/beamOn " + str(n_particles) + " \n")
     f.close()
     print("wrote ", macro_path)
+
     return mf
+
+
+def find_disp_pos(theta: float, z_disp: float) -> float:
+    """
+    find displacement position so that the second pt source is a certain angular disp away from first
+
+    params:
+        theta:  desired angular displacement in degrees
+        z_disp: distance from detector where sources are initialized
+    returns:
+        x_disp: displacement in x axis for the angular separation of sources
+    """
+
+    # find displaced postion needed to get an angular displacement
+    x_disp = z_disp * np.tan(np.deg2rad(theta))
+
+    return x_disp

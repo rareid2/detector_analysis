@@ -1,4 +1,19 @@
-def write_det_config(det1_thickness_um, det_gap_mm, win_thickness_um, det_size_cm):
+def write_det_config(
+    det1_thickness_um: float,
+    det_gap_mm: float,
+    win_thickness_um: float,
+    det_size_cm: float,
+) -> None:
+    """
+    write a config file that sets up detector geometry
+
+    params:
+        det1_thickness_um: thickness of front detector in um
+        det_gap_mm:        gap between detectors in mm
+        win_thickness_um:  thickness of window in um
+    returns:
+    """
+
     f = open("../EPAD_geant4/src/det_config.txt", "w+")
     # thickness in um
     f.write(str(det1_thickness_um) + "\n")
@@ -16,8 +31,24 @@ def write_det_config(det1_thickness_um, det_gap_mm, win_thickness_um, det_size_c
 
 
 def write_ca_config(
-    n_elements, mask_thickness_um, mask_gap_cm, element_size_mm, aperture_filename
-):
+    n_elements: int,
+    mask_thickness_um: float,
+    mask_gap_cm: float,
+    element_size_mm: float,
+    aperture_filename: str,
+) -> None:
+    """
+    write a config file that sets up coded aperture geometry
+
+    params:
+        n_elements:        total number of elements in mask design
+        mask_thickness_um: thickness of mask in um
+        mask_gap_cm:       gap between mask and front detector in cm
+        element_size_mm:   size of each aperture element in mm
+        aperture_filename: filename containing MURA design structure
+    returns:
+    """
+
     f = open("../EPAD_geant4/src/ca_config.txt", "w+")
     # n elements (total number for mosaic)
     f.write(str(n_elements) + "\n")

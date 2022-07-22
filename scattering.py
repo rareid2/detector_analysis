@@ -1,4 +1,3 @@
-# class to process hits and find
 from hits import Hits
 from simulation_engine import SimulationEngine
 
@@ -12,15 +11,26 @@ class Scattering:
         self,
         hits: Hits,
         simulation_engine: SimulationEngine,
-        save_fig_directory="../results/two_detector_config/",
-    ):
+        save_fig_directory: "../results/two_detector_config/" = str,
+    ) -> None:
+
         self.hits_dict = hits.hits_dict
         self.energy_keV = simulation_engine.energy_keV
         self.det1_thickness_um = simulation_engine.det1_thickness_um
         self.gap_in_cm = simulation_engine.det_gap_mm / 10
         self.save_fig_directory = save_fig_directory
 
-    def get_thetas(self):
+        return
+
+    def get_thetas(self) -> np.ndarray():
+        """
+        get scattering angles in degrees
+
+        params:
+        returns:
+            thetas_deg: scattering angles in degress from each hit
+        """
+
         # if no hits on both detectors, exit
         if "Position1" not in self.hits_dict:
             print("cant get delta x, hits only on one detector")
@@ -41,11 +51,13 @@ class Scattering:
 
         return self.thetas_deg
 
-    def get_sigma(self):  # -- need to accommadate input angles when not 0
+    def get_sigma(self) -> float:  # -- need to accommadate input angles when not 0
         """
-        get the standard deviation of the scattering angles of the particles
+        get sigma (std dev) of the scattering angles in degrees
 
-        :return:
+        params:
+        returns:
+            sigma_deg: std deviation of scattering angles in deg
         """
 
         sigma_deg = np.std(self.thetas_deg)
@@ -56,14 +68,19 @@ class Scattering:
 
     def get_theoretical_dist(
         self,
-        material="Si",
-        charge_nmbr=1,
-        rest_mass_MeV=0.511,
-    ):
+        material: "Si" = str,
+        charge_nmbr: 1 = int,
+        rest_mass_MeV: 0.511 = float,
+    ) -> float:
         """
-        compute the theoretical distribution associated with scattering particles in silicon
+        get theoretical distribution of scattering in the detector
 
-        :return:
+        params:
+            material:              material of detector/scattering medium
+            charge_nmbr:           charge number of incoming particles
+            rest_mass_MeV:         rest mass in MeV of incomcing particle
+        returns:
+            sigma_deg_theoretical: std deviation of the theoretical distribution
         """
 
         if material == "Be":
@@ -105,9 +122,17 @@ class Scattering:
         sigma_deg_theoretical = np.rad2deg(t1 * t2)
 
         self.sigma_deg_theoretical = sigma_deg_theoretical
+
         return self.sigma_deg_theoretical
 
-    def plot_theoretical(self, save_fig=True):
+    def plot_theoretical(self, save_fig: True = bool) -> None:
+        """
+        plot theoretical distribution of scattering in the detector
+
+        params:
+            save_fig: true or false if u want to save
+        returns:
+        """
 
         print("creating figure")
 
@@ -150,10 +175,18 @@ class Scattering:
                 dpi=500,
             )
         plt.show()
+        plt.close()
 
-        # small difference because of the window!
+        return
 
-    def plot_compare_th_sim(self, save_fig=True):
+    def plot_compare_th_sim(self, save_fig: True = bool) -> None:
+        """
+        plot comparing theoretical and simulated distribution of scattering in the detector
+
+        params:
+            save_fig: true or false if u want to save
+        returns:
+        """
 
         print("creating figure")
 
@@ -197,3 +230,6 @@ class Scattering:
                 dpi=500,
             )
         plt.show()
+        plt.close()
+
+        return

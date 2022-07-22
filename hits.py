@@ -4,12 +4,10 @@ from uncertainty import add_uncertainty
 from simulation_engine import SimulationEngine
 
 
-# TODO: change comment formatting
-
-
 class Hits:
-    def __init__(self, simulation_engine: SimulationEngine, fname):
-        # filename with hits
+    def __init__(self, simulation_engine: SimulationEngine, fname: str) -> None:
+
+        # filename containing hits data
         self.fname = fname
 
         # parse the hits
@@ -38,11 +36,15 @@ class Hits:
         # get detector size if needed for uncertainty
         self.det_size_cm = simulation_engine.det_size_cm
 
-    def getBothDetHits(self):
-        """
-        returns hits from particles that hit both detectors -- only particles that hit both detectors
+        return
 
-        :return: dict containing positions of hits on detectors (key Position1 and Position2) and Energies (key Energy1 and Energy2)
+    def get_both_det_hits(self) -> dict:
+        """
+        return a dictionary containing hits on both detectors
+
+        params:
+        returns:
+            hits_dict: contains positions of hits for each detector in particle order, also has energies
         """
 
         array_counter = 0
@@ -108,11 +110,15 @@ class Hits:
 
         print("processed detector hits")
 
-    def getDetHits(self):
-        """
-        parses hit file and returns hits from only the first detector
+        return hits_dict
 
-        :return: dict containing positions of hits on detector and energies
+    def get_det_hits(self) -> dict:
+        """
+        return a dictionary containing hits on front detector
+
+        params:
+        returns:
+            hits_dict: contains positions of hits for front detector in particle order, also has energies
         """
 
         posX = []
@@ -138,17 +144,19 @@ class Hits:
 
         print("processed detector hits")
 
-    def update_pos_uncertainty(self, dist_type, dist_param):
+        return hits_dict
+
+    def update_pos_uncertainty(self, dist_type: str, dist_param: float) -> None:
         """
-        update positions to include uncertainty to detector hits
+        return a dictionary containing hits on both detectors
 
-        :param dist_type: string, "Gaussian" or "Poission" or "Uniform"
-        :param dist_param: float, determined by dist_type, in milimeters
-            if "Gaussian" standard deviation
-            if "Poission" 1/lambda
-            if "Uniform" bounds for uniform
-
-        :return:
+        params:
+            dist_type:  "Gaussian", "Poission", or "Uniform" distribution to sample uncertainty from
+            dist_param: determined by dist_type, in milimeters
+                        if "Gaussian" standard deviation
+                        if "Poission" 1/lambda
+                        if "Uniform" bounds for uniform
+        returns:
         """
 
         if len(self.hits_dict.keys()) > 2:

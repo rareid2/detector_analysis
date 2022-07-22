@@ -5,12 +5,10 @@ import os
 
 EPAD_dir = "/home/rileyannereid/workspace/geant4/EPAD_geant4"
 
-# TODO: commenting and formatting
-# TODO: detector size!!!
-
 
 class SimulationEngine:
     def __init__(self, sim_type, write_files=True) -> None:
+
         self.sim_type = sim_type
         self.write_files = write_files
 
@@ -28,33 +26,51 @@ class SimulationEngine:
             self.cwd = cwd
 
             os.chdir(EPAD_dir)
-            try:
-                os.system("git checkout %s" % self.sim_type)
-            except:
-                raise ValueError("enter a valid branch name")
+            os.system("git stash save")
+            os.system("git checkout %s" % self.sim_type)
 
             os.chdir(self.cwd)
 
+        return
+
     def det_config(
         self,
-        det1_thickness_um=140,
-        det_gap_mm=30,
-        win_thickness_um=100,
-        det_size_cm=6.3,
-    ):
+        det1_thickness_um: 140 = float,
+        det_gap_mm: 30 = float,
+        win_thickness_um: 100 = float,
+        det_size_cm: 6.3 = float,
+    ) -> None:
+        """
+        update detecotr configuration parameters
+
+        params:
+            see self.set_config()
+        returns:
+        """
+
         self.det1_thickness_um = det1_thickness_um
         self.det_gap_mm = det_gap_mm
         self.win_thickness_um = win_thickness_um
         self.det_size_cm = det_size_cm
 
+        return
+
     def ca_config(
         self,
-        n_elements=133,
-        mask_thickness_um=400,
-        mask_gap_cm=3,
-        element_size_mm=0.66,
-        mosaic=True,
-    ):
+        n_elements: 133 = int,
+        mask_thickness_um: 400 = float,
+        mask_gap_cm: 3 = float,
+        element_size_mm: 0.66 = float,
+        mosaic: True = bool,
+    ) -> None:
+        """
+        update coded aperture configuration parameters
+
+        params:
+            see self.set_config()
+        returns:
+        """
+
         self.n_elements = n_elements
         self.mask_thickness_um = mask_thickness_um
         self.mask_gap_cm = mask_gap_cm
@@ -79,17 +95,34 @@ class SimulationEngine:
             ms,
         )
 
+        return
+
     def set_config(
         self,
-        det1_thickness_um=140,
-        det_gap_mm=30,
-        win_thickness_um=100,
-        det_size_cm=6.3,
-        n_elements=133,
-        mask_thickness_um=400,
-        mask_gap_cm=3,
-        element_size_mm=0.66,
-    ):
+        det1_thickness_um: 140 = float,
+        det_gap_mm: 30 = float,
+        win_thickness_um: 100 = float,
+        det_size_cm: 6.3 = float,
+        n_elements: 133 = int,
+        mask_thickness_um: 400 = float,
+        mask_gap_cm: 3 = float,
+        element_size_mm: 0.66 = float,
+    ) -> None:
+        """
+        sets all the config parameters based on sim type and writes them if option selected
+
+        params:
+            det1_thickness_um: thickness of front detector in um
+            det_gap_mm:        gap between detectors in mm
+            win_thickness_um:  thickness of window in um
+            det_size_cm:       xy size of front detector in cm
+            n_elements:        number of total elements in design
+            mask_thickness_um: thickness of coded aperture in um
+            mask_gap_cm:       gap between mask and front detector in cm
+            element_size_mm:   size in mm of a single element of the design
+        returns:
+        """
+
         self.det_config()
         if self.write_files:
             write_det_config(
@@ -110,14 +143,22 @@ class SimulationEngine:
                     aperture_filename=self.aperture_filename,
                 )
 
+        return
+
     def set_macro(
         self,
-        n_particles,
+        n_particles: int,
         energy_keV,
         positions=[[0, 0, -500]],
         directions=[0],
-        PAD_run=1,
-    ):
+        PAD_run: 1 = int,
+    ) -> None:
+        """
+        create macro file based on simulation type -- see macros.py for function defs
+
+        params:
+        returns:
+        """
 
         if self.write_files:
             if self.sim_type == "two-detectors":
@@ -141,10 +182,37 @@ class SimulationEngine:
                     folding_energy_keV=energy_keV,
                 )
             self.macro_file = macro_file
+
+        # if just two detectors, save energy to be accessed in scattering class
         elif self.sim_type == "two-detectors":
             self.energy_keV = energy_keV
 
-    def run_simulation(self):
+        return
+
+    def rename_hits(self, fname: str) -> None:
+        """
+        rename the output hits file
+
+        params:
+            fname: new data file name and location
+        returns:
+        """
+
+        os.rename("../data/hits.csv", fname)
+
+        return
+
+    def run_simulation(
+        self, fname: "../data/hits.csv" = str
+    ) -> None:  # need to add optoin to not rebuild each time (?)
+        """
+        build geant for sim type and run macro, rename data file after
+
+        params:
+            fname: new data file name and location
+        returns:
+        """
+
         # build the code for the desired configuration
         os.chdir(EPAD_dir)
         os.chdir("build")
@@ -153,3 +221,9 @@ class SimulationEngine:
         cmd = "build/main %s/macros/%s" % (EPAD_dir, self.macro_file)
         os.system(cmd)
         os.chdir(self.cwd)
+
+        self.rename_hits(fname)
+
+        print("simulation complete")
+
+        return

@@ -1,19 +1,22 @@
 import numpy as np
 
 
-def add_uncertainty(pos, dist_type, dist_param, bound):
+def add_uncertainty(
+    pos: tuple, dist_type: str, dist_param: float, bound: float
+) -> tuple:
     """
     generates random sample and updates position to include uncertainty
 
-    :param pos: tuple with (x,y) position
-    :param dist_type: string, "Gaussian" or "Poission" or "Uniform"
-    :param dist_param: float, determined by dist_type, in milimeters
-        if "Gaussian" standard deviation
-        if "Poission" 1/lambda
-        if "Uniform" bounds for uniform
-    :param bound: boundary of detector
-
-    :return: tuple with updated (x,y) position
+    params:
+        pos:        xy positions on the detector
+        dist_type:  "Gaussian", "Poission", or "Uniform" distribution to sample uncertainty from
+        dist_param: determined by dist_type, in milimeters
+                    if "Gaussian" standard deviation
+                    if "Poission" 1/lambda
+                    if "Uniform" bounds for uniform
+        bound:      dimensions of detector (cm) to make sure uncertainty doesnt push off detector
+    returns:
+        newpos:     new position with uncertainty added
     """
 
     # confirm within bounds
@@ -45,4 +48,6 @@ def add_uncertainty(pos, dist_type, dist_param, bound):
         if np.abs(posx) <= bound and np.abs(posy) <= bound:
             break
 
-    return (posx, posy)
+    newpos = (posx, posy)
+
+    return newpos
