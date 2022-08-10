@@ -2,6 +2,8 @@ from simulation_engine import SimulationEngine
 from hits import Hits
 
 import numpy as np
+from numpy.typing import NDArray
+from typing import Tuple
 import matplotlib.pyplot as plt
 from scipy.ndimage import zoom
 import sys
@@ -39,7 +41,7 @@ class Deconvolution:
 
         return
 
-    def get_raw(self) -> np.ndarray():
+    def get_raw(self) -> NDArray[np.uint16]:
         """
         get raw hits and 2d histogram
 
@@ -61,7 +63,7 @@ class Deconvolution:
         return heatmap
 
     def plot_heatmap(
-        self, heatmap: np.ndarray, save_name: str, label: "# particles" = str
+        self, heatmap: NDArray[np.uint16], save_name: str, label: str = "# particles"
     ) -> None:
         """
         plot a heatmap using imshow
@@ -81,7 +83,7 @@ class Deconvolution:
 
         return
 
-    def get_mask(self) -> np.ndarray():
+    def get_mask(self) -> NDArray[np.uint16]:
         """
         get MURA mask design as a 2d array
 
@@ -98,7 +100,7 @@ class Deconvolution:
 
         return mask
 
-    def get_decoder(self) -> np.ndarray():
+    def get_decoder(self) -> NDArray[np.uint16]:
         """
         get decoding array
 
@@ -123,7 +125,7 @@ class Deconvolution:
 
         return decoder
 
-    def fft_conv(self) -> np.ndarray():
+    def fft_conv(self) -> NDArray[np.uint16]:
         """
         perform deconvolution using inverse fft
 
@@ -151,7 +153,7 @@ class Deconvolution:
 
     def check_resolved(
         self, condition: str
-    ) -> [np.ndarray(), np.ndarray(), float, float, bool]:
+    ) -> Tuple[NDArray[np.uint16], NDArray[np.uint16], float, float, bool]:
         """
         check if two peaks are "resolved", i.e. the valley between them is lower than
         the peak by atleast half/quarter of the peak height above the noise floor
@@ -262,14 +264,14 @@ class Deconvolution:
         self,
         multiplier: int,
         plot_raw_heatmap: False = bool,
-        save_raw_heatmap: "raw_hits_heatmap.png" = str,
-        plot_deconvolved_heatmap: False = bool,
-        save_deconvolve_heatmap: "deconvolved_image.png" = str,
-        plot_signal_peak: False = bool,
-        save_peak: "peak.png" = str,
-        plot_conditions: False = bool,
-        check_resolved: False = bool,
-        condition: "half_val" = str,
+        save_raw_heatmap: str = "raw_hits_heatmap.png",
+        plot_deconvolved_heatmap: bool = False,
+        save_deconvolve_heatmap: str = "deconvolved_image.png",
+        plot_signal_peak: bool = False,
+        save_peak: str = "peak.png",
+        plot_conditions: bool = False,
+        check_resolved: bool = False,
+        condition: str = "half_val",
     ) -> bool:
         """
         perform all the steps to deconvolve a raw image

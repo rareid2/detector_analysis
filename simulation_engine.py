@@ -7,7 +7,7 @@ EPAD_dir = "/home/rileyannereid/workspace/geant4/EPAD_geant4"
 
 
 class SimulationEngine:
-    def __init__(self, sim_type, write_files=True) -> None:
+    def __init__(self, sim_type, write_files: bool = True) -> None:
 
         self.sim_type = sim_type
         self.write_files = write_files
@@ -35,10 +35,10 @@ class SimulationEngine:
 
     def det_config(
         self,
-        det1_thickness_um: 140 = float,
-        det_gap_mm: 30 = float,
-        win_thickness_um: 100 = float,
-        det_size_cm: 6.3 = float,
+        det1_thickness_um: float = 140,
+        det_gap_mm: float = 30,
+        win_thickness_um: float = 100,
+        det_size_cm: float = 6.3,
     ) -> None:
         """
         update detecotr configuration parameters
@@ -57,11 +57,11 @@ class SimulationEngine:
 
     def ca_config(
         self,
-        n_elements: 133 = int,
-        mask_thickness_um: 400 = float,
-        mask_gap_cm: 3 = float,
-        element_size_mm: 0.66 = float,
-        mosaic: True = bool,
+        n_elements: int = 133,
+        mask_thickness_um: float = 400,
+        mask_gap_cm: float = 3,
+        element_size_mm: float = 0.66,
+        mosaic: bool = True,
     ) -> None:
         """
         update coded aperture configuration parameters
@@ -99,14 +99,14 @@ class SimulationEngine:
 
     def set_config(
         self,
-        det1_thickness_um: 140 = float,
-        det_gap_mm: 30 = float,
-        win_thickness_um: 100 = float,
-        det_size_cm: 6.3 = float,
-        n_elements: 133 = int,
-        mask_thickness_um: 400 = float,
-        mask_gap_cm: 3 = float,
-        element_size_mm: 0.66 = float,
+        det1_thickness_um: float = 140,
+        det_gap_mm: float = 30,
+        win_thickness_um: float = 100,
+        det_size_cm: float = 6.3,
+        n_elements: int = 133,
+        mask_thickness_um: float = 400,
+        mask_gap_cm: float = 3,
+        element_size_mm: float = 0.66,
     ) -> None:
         """
         sets all the config parameters based on sim type and writes them if option selected
@@ -151,7 +151,7 @@ class SimulationEngine:
         energy_keV,
         positions=[[0, 0, -500]],
         directions=[0],
-        PAD_run: 1 = int,
+        PAD_run: int = 1,
     ) -> None:
         """
         create macro file based on simulation type -- see macros.py for function defs
@@ -203,7 +203,7 @@ class SimulationEngine:
         return
 
     def run_simulation(
-        self, fname: "../data/hits.csv" = str
+        self, fname: str = "../data/hits.csv"
     ) -> None:  # need to add optoin to not rebuild each time (?)
         """
         build geant for sim type and run macro, rename data file after

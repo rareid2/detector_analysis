@@ -2,6 +2,7 @@ from hits import Hits
 from simulation_engine import SimulationEngine
 
 import numpy as np
+from numpy.typing import NDArray
 import scipy.stats
 import matplotlib.pyplot as plt
 
@@ -11,7 +12,7 @@ class Scattering:
         self,
         hits: Hits,
         simulation_engine: SimulationEngine,
-        save_fig_directory: "../results/two_detector_config/" = str,
+        save_fig_directory: str = "../results/two_detector_config/",
     ) -> None:
 
         self.hits_dict = hits.hits_dict
@@ -22,7 +23,7 @@ class Scattering:
 
         return
 
-    def get_thetas(self) -> np.ndarray():
+    def get_thetas(self) -> NDArray[np.uint16]:
         """
         get scattering angles in degrees
 
@@ -68,9 +69,9 @@ class Scattering:
 
     def get_theoretical_dist(
         self,
-        material: "Si" = str,
-        charge_nmbr: 1 = int,
-        rest_mass_MeV: 0.511 = float,
+        material: str = "Si",
+        charge_nmbr: int = 1,
+        rest_mass_MeV: float = 0.511,
     ) -> float:
         """
         get theoretical distribution of scattering in the detector
@@ -125,7 +126,7 @@ class Scattering:
 
         return self.sigma_deg_theoretical
 
-    def plot_theoretical(self, save_fig: True = bool) -> None:
+    def plot_theoretical(self, save_fig: bool = True) -> None:
         """
         plot theoretical distribution of scattering in the detector
 
@@ -179,7 +180,7 @@ class Scattering:
 
         return
 
-    def plot_compare_th_sim(self, save_fig: True = bool) -> None:
+    def plot_compare_th_sim(self, save_fig: bool = True) -> None:
         """
         plot comparing theoretical and simulated distribution of scattering in the detector
 

@@ -1,9 +1,10 @@
 import numpy as np
+from typing import Tuple
 
 
 def add_uncertainty(
-    pos: tuple, dist_type: str, dist_param: float, bound: float
-) -> tuple:
+    pos: Tuple, dist_type: str, dist_param: float, bound: float
+) -> Tuple:
     """
     generates random sample and updates position to include uncertainty
 
