@@ -4,7 +4,7 @@ from macros import write_angle_beam_macro, write_PAD_macro, write_pt_macro
 import os
 
 EPAD_dir = "/home/rileyannereid/workspace/geant4/EPAD_geant4"
-
+GEANT_dir = "/home/rileyannereid/workspace/geant4/geant4.10.07.p02-install/bin/"
 
 class SimulationEngine:
     def __init__(self, sim_type, write_files: bool = True) -> None:
@@ -214,6 +214,10 @@ class SimulationEngine:
         """
 
         # build the code for the desired configuration
+        os.chdir(GEANT_dir)
+        cwd = os.getcwd()
+        # TODO fix this
+        os.system(". ./geant4.sh")
         os.chdir(EPAD_dir)
         os.chdir("build")
         os.system("cmake .. & make")
