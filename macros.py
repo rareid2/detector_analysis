@@ -11,7 +11,7 @@ from typing import List
 def write_angle_beam_macro(
     n_particles: int,
     energy_keV: float,
-    macro_directory: str = "/home/rileyannereid/workspace/geant4/EPAD_geant4",
+    macro_directory: str = "/home/rileyannereid/workspace/geant4/EPAD_geant4/macros",
 ) -> None:
     """
     create macro file for a particle beam at an angle off the y-axis
@@ -52,7 +52,7 @@ def write_pt_macro(
     rotations: List,
     energies_keV: List,
     world_size: float,
-    macro_directory: str = "/home/rileyannereid/workspace/geant4/EPAD_geant4",
+    macro_directory: str = "/home/rileyannereid/workspace/geant4/EPAD_geant4/macros",
 ) -> None:
     """
     create macro file for a point source (or multiple point sources)
@@ -137,7 +137,7 @@ def write_PAD_macro(
     n_particles: int,
     PAD_run: int,
     folding_energy_keV: float,
-    macro_directory: str = "/home/rileyannereid/workspace/geant4/EPAD_geant4",
+    macro_directory: str = "/home/rileyannereid/workspace/geant4/EPAD_geant4/macros",
 ) -> None:
     """
     create macro file for a pitch angle distribution
