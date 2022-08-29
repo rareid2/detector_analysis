@@ -63,7 +63,11 @@ class Deconvolution:
         return heatmap
 
     def plot_heatmap(
-        self, heatmap: NDArray[np.uint16], save_name: str, label: str = "# particles"
+        self,
+        heatmap: NDArray[np.uint16],
+        save_name: str,
+        label: str = "# particles",
+        vmax: float = None,
     ) -> None:
         """
         plot a heatmap using imshow
@@ -72,11 +76,12 @@ class Deconvolution:
             heatmap:   numpy 2d array to plot
             save_name: file_name to save under
             label:     label for colorbar
+            vmax:      max for colorbar
         returns:
         """
 
         # plot transpose for visualization
-        plt.imshow(heatmap.T, origin="lower", cmap="RdBu_r")
+        plt.imshow(heatmap.T, origin="lower", cmap="RdBu_r", vmax=vmax)
         plt.colorbar(label=label)
         plt.savefig(save_name, dpi=300)
         plt.close()
@@ -272,6 +277,7 @@ class Deconvolution:
         plot_conditions: bool = False,
         check_resolved: bool = False,
         condition: str = "half_val",
+        vmax: float = None,
     ) -> bool:
         """
         perform all the steps to deconvolve a raw image
@@ -288,6 +294,7 @@ class Deconvolution:
             check_resolved:           check if two peaks are resolved or not based on input condition
             condition:                'half_val' or 'quarter_val' depending on condition to check if peaks
                                       are resolved
+            vmax:                     max for colorbar
         returns:
             resolved:                 true or false if the peaks are resolved based on input condition
         """
@@ -301,7 +308,7 @@ class Deconvolution:
         self.get_raw()
 
         if plot_raw_heatmap:
-            self.plot_heatmap(self.raw_heatmap, save_name=save_raw_heatmap)
+            self.plot_heatmap(self.raw_heatmap, save_name=save_raw_heatmap, vmax=vmax)
 
         # get mask and decoder
         self.get_mask()
@@ -321,6 +328,7 @@ class Deconvolution:
                 self.deconvolved_image,
                 save_name=save_deconvolve_heatmap,
                 label="signal",
+                vmax=vmax,
             )
 
         snr = np.amax(np.abs(self.deconvolved_image)) / np.std(
@@ -333,7 +341,9 @@ class Deconvolution:
         if np.shape(max_col)[0] > 1:
             max_col = max_col[0]
 
-        self.signal = np.fliplr(self.deconvolved_image)[:, int(max_col)]
+        # self.signal = np.fliplr(self.deconvolved_image)[:, int(max_col)]
+        # self.signal = np.fliplr(self.deconvolved_image)[:, 536]
+        self.signal = np.sum(self.deconvolved_image, axis=0)
 
         if plot_signal_peak:
             resolved = self.plot_peak(save_peak, plot_conditions, condition)

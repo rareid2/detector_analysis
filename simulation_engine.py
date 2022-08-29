@@ -6,10 +6,14 @@ import os
 EPAD_dir = "/home/rileyannereid/workspace/geant4/EPAD_geant4"
 GEANT_dir = "/home/rileyannereid/workspace/geant4/geant4.10.07.p02-install/bin/"
 
-class SimulationEngine:
-    def __init__(self, sim_type, write_files: bool = True) -> None:
 
-        self.sim_type = sim_type
+class SimulationEngine:
+    def __init__(
+        self, construct: str = "CA", source: str = "DS", write_files: bool = True
+    ) -> None:
+
+        self.construct = construct
+        self.source = source
         self.write_files = write_files
 
         # set some params from geant
@@ -20,19 +24,6 @@ class SimulationEngine:
         self.world_offset = self.env_sizeZ * 0.45
         self.detector_placement = self.world_offset  # im cm
 
-        if self.write_files:
-            # switch to desired branch
-            cwd = os.getcwd()
-            self.cwd = cwd
-
-            os.chdir(EPAD_dir)
-            os.system("git stash save")
-            os.system("git checkout %s" % self.sim_type)
-
-            os.chdir(self.cwd)
-
-        return
-
     def det_config(
         self,
         det1_thickness_um: float = 140,
@@ -41,7 +32,7 @@ class SimulationEngine:
         det_size_cm: float = 6.3,
     ) -> None:
         """
-        update detecotr configuration parameters
+        update detector configuration parameters
 
         params:
             see self.set_config()
@@ -132,7 +123,7 @@ class SimulationEngine:
                 det_size_cm=det_size_cm,
             )
 
-        if self.sim_type != "two-detectors":
+        if self.construct != "TD":
             self.ca_config()
             if self.write_files:
                 write_ca_config(
@@ -161,13 +152,13 @@ class SimulationEngine:
         """
 
         if self.write_files:
-            if self.sim_type == "two-detectors":
+            if self.construct == "TD":
                 macro_file = write_angle_beam_macro(
                     n_particles=n_particles, energy_keV=energy_keV
                 )
                 # update energy
                 self.energy_keV = energy_keV
-            elif self.sim_type == "ca-pt-source":
+            elif self.construct == "CA" and self.source == "PS":
                 macro_file = write_pt_macro(
                     n_particles=n_particles,
                     positions=positions,
@@ -184,7 +175,7 @@ class SimulationEngine:
             self.macro_file = macro_file
 
         # if just two detectors, save energy to be accessed in scattering class
-        elif self.sim_type == "two-detectors":
+        elif self.construct == "TD":
             self.energy_keV = energy_keV
 
         return
@@ -202,29 +193,49 @@ class SimulationEngine:
 
         return
 
-    def run_simulation(
-        self, fname: str = "../data/hits.csv"
-    ) -> None:  # need to add optoin to not rebuild each time (?)
+    def build_simulation(self):
         """
-        build geant for sim type and run macro, rename data file after
+        build the simulation
 
         params:
-            fname: new data file name and location
         returns:
         """
 
         # build the code for the desired configuration
-        os.chdir(GEANT_dir)
+        # os.chdir(GEANT_dir)
         cwd = os.getcwd()
         # TODO fix this
-        os.system(". ./geant4.sh")
+        # os.system(". ./geant4.sh")
         os.chdir(EPAD_dir)
         os.chdir("build")
-        os.system("cmake .. & make")
-        os.chdir("..")
+        os.system("make clean")
+        os.system(
+            "cmake -DCONSTRUCT=%s -DPARTICLE_SOURCE=%s .. & make"
+            % (self.construct, self.source)
+        )
+        os.chdir(cwd)
+
+        return
+
+    def run_simulation(
+        self, fname: str = "../data/hits.csv", build: bool = True
+    ) -> None:  # need to add optoin to not rebuild each time (?)
+        """
+        run macro, rename data file after
+
+        params:
+            fname: new data file name and location
+            build: build or nah?
+        returns:
+        """
+        if build:
+            self.build_simulation()
+
+        cwd = os.getcwd()
+        os.chdir(EPAD_dir)
         cmd = "build/main %s/macros/%s" % (EPAD_dir, self.macro_file)
         os.system(cmd)
-        os.chdir(self.cwd)
+        os.chdir(cwd)
 
         self.rename_hits(fname)
 
