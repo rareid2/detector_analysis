@@ -25,7 +25,7 @@ def write_angle_beam_macro(
     mf = "run_angle_beam.mac"
     macro_path = os.path.join(macro_directory, mf)
     with open(macro_path, "w") as f:
-        f.write("/run/numberOfThreads 40 \n")
+        #f.write("/run/numberOfThreads 40 \n")
         f.write("/run/initialize \n")
         f.write("/control/verbose 0 \n")
         f.write("/run/verbose 0 \n")

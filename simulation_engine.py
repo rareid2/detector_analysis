@@ -152,7 +152,7 @@ class SimulationEngine:
         """
 
         if self.write_files:
-            if self.construct == "TD":
+            if self.construct == "TD" and self.source == "PS":
                 macro_file = write_angle_beam_macro(
                     n_particles=n_particles, energy_keV=energy_keV
                 )
@@ -175,7 +175,7 @@ class SimulationEngine:
             self.macro_file = macro_file
 
         # if just two detectors, save energy to be accessed in scattering class
-        elif self.construct == "TD":
+        if self.construct == "TD":
             self.energy_keV = energy_keV
 
         return
@@ -200,6 +200,10 @@ class SimulationEngine:
         params:
         returns:
         """
+        print(
+            "cmake -DCONSTRUCT=%s -DPARTICLE_SOURCE=%s .. & make"
+            % (self.construct, self.source)
+        )
 
         # build the code for the desired configuration
         # os.chdir(GEANT_dir)

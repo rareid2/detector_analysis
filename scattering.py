@@ -213,7 +213,7 @@ class Scattering:
             color=cc[0],
             alpha=0.5,
         )
-        plt.hist(self.thetas_deg, label="geant simulation", color=cc[1])
+        plt.hist(self.thetas_deg, label="geant simulation", color=cc[1], density=True, bins=30)
 
         plt.xlabel("scattering angle [deg]")
         plt.legend()
