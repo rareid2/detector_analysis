@@ -9,23 +9,38 @@ from deconvolution import Deconvolution
 # construct = CA and TD
 # source = DS and PS
 
-simulation_engine = SimulationEngine(construct="TD", source="PS", write_files=True)
+simulation_engine = SimulationEngine(construct="CA", source="DS", write_files=True)
 simulation_engine.set_config(
     det1_thickness_um=140,
     det_gap_mm=30,
     win_thickness_um=100,
-    det_size_cm=4.389,
+    det_size_cm=4.422,
+    n_elements=1,
+    mask_thickness_um=400,
+    mask_gap_cm=1,
+    element_size_mm=1,
+    mosaic=False,
+    mask_size=87,
 )
 
-simulation_engine.set_macro(n_particles=10000, energy_keV=5000)
-# fname = "../data/hits_1e9_3_400_sin.csv"
-fname = "../data/test.csv"
-simulation_engine.run_simulation(fname, build=True)
-myhits = Hits(simulation_engine, fname)
-myhits.get_both_det_hits()
+sims = [0, 1, 2, 3]
+sim_str = ["90","sine", "sine_sq", "tri"]
 
-scattering = Scattering(myhits, simulation_engine)
-scattering.get_thetas()
-scattering.get_theoretical_dist()
-scattering.plot_theoretical()
-scattering.plot_compare_th_sim()
+for s, ss in zip(sims, sim_str):
+    simulation_engine.set_macro(n_particles=100000, energy_keV=500, PAD_run=s)
+    fname = "../data/pinhole/pinhole_%s.csv" % (ss)
+    #simulation_engine.run_simulation(fname, build=True)
+
+    myhits = Hits(simulation_engine, fname)
+    myhits.get_det_hits()
+
+    deconvolver = Deconvolution(myhits, simulation_engine)
+    deconvolver.multiplier = 1
+
+    # shift origin
+    deconvolver.shift_pos()
+
+    # get heatmap
+    deconvolver.get_raw()
+
+    deconvolver.plot_heatmap(deconvolver.raw_heatmap, save_name="../results/pinhole/pinhole_%s.png" % (ss))
