@@ -35,6 +35,7 @@ def write_ca_config(
     mask_thickness_um: float,
     mask_gap_cm: float,
     element_size_mm: float,
+    mask_size_mm: float,
     aperture_filename: str,
 ) -> None:
     """
@@ -58,6 +59,9 @@ def write_ca_config(
     f.write(str(mask_gap_cm) + "\n")
     # size of elements in mm
     f.write(str(element_size_mm) + "\n")
+    # size of mask in mm
+    f.write(str(mask_size_mm) + "\n")
+
     # aperture filename
     aperture_path = "./src/mask_designs/" + aperture_filename
     f.write(aperture_path)

@@ -53,6 +53,7 @@ class SimulationEngine:
         mask_gap_cm: float = 3,
         element_size_mm: float = 0.66,
         mosaic: bool = True,
+        mask_size: float = None,
     ) -> None:
         """
         update coded aperture configuration parameters
@@ -76,9 +77,13 @@ class SimulationEngine:
             m_str = ""
             self.mura_elements = rr
 
-        # define mask size
-        ms = round(n_elements * element_size_mm, 2)
-
+        # define mask size if not input
+        if mask_size == None:
+            ms = round(n_elements * element_size_mm, 2)
+        else:
+            ms = mask_size
+        self.mask_size = ms
+        
         # define aperture filename
         self.aperture_filename = "%d%sMURA_matrix_%.2f.txt" % (
             rr,
@@ -99,6 +104,7 @@ class SimulationEngine:
         mask_gap_cm: float = 3,
         element_size_mm: float = 0.66,
         mosaic: bool = True,
+        mask_size: float = None,
     ) -> None:
         """
         sets all the config parameters based on sim type and writes them if option selected
@@ -134,7 +140,12 @@ class SimulationEngine:
 
         if self.construct != "TD":
             self.ca_config(
-                n_elements, mask_thickness_um, mask_gap_cm, element_size_mm, mosaic
+                n_elements,
+                mask_thickness_um,
+                mask_gap_cm,
+                element_size_mm,
+                mosaic,
+                mask_size,
             )
             if self.write_files:
                 write_ca_config(
@@ -142,6 +153,7 @@ class SimulationEngine:
                     mask_thickness_um=mask_thickness_um,
                     mask_gap_cm=mask_gap_cm,
                     element_size_mm=element_size_mm,
+                    mask_size_mm=self.mask_size,
                     aperture_filename=self.aperture_filename,
                 )
 
