@@ -98,6 +98,7 @@ class SimulationEngine:
         mask_thickness_um: float = 400,
         mask_gap_cm: float = 3,
         element_size_mm: float = 0.66,
+        mosaic: bool = True,
     ) -> None:
         """
         sets all the config parameters based on sim type and writes them if option selected
@@ -111,10 +112,18 @@ class SimulationEngine:
             mask_thickness_um: thickness of coded aperture in um
             mask_gap_cm:       gap between mask and front detector in cm
             element_size_mm:   size in mm of a single element of the design
+            mosaic:            whether or not the design is mosaicked
         returns:
         """
 
-        self.det_config()
+        # TODO: clean up this method
+
+        self.det_config(
+            det1_thickness_um=det1_thickness_um,
+            det_gap_mm=det_gap_mm,
+            win_thickness_um=win_thickness_um,
+            det_size_cm=det_size_cm,
+        )
         if self.write_files:
             write_det_config(
                 det1_thickness_um=det1_thickness_um,
@@ -124,7 +133,9 @@ class SimulationEngine:
             )
 
         if self.construct != "TD":
-            self.ca_config()
+            self.ca_config(
+                n_elements, mask_thickness_um, mask_gap_cm, element_size_mm, mosaic
+            )
             if self.write_files:
                 write_ca_config(
                     n_elements=n_elements,
@@ -200,10 +211,6 @@ class SimulationEngine:
         params:
         returns:
         """
-        print(
-            "cmake -DCONSTRUCT=%s -DPARTICLE_SOURCE=%s .. & make"
-            % (self.construct, self.source)
-        )
 
         # build the code for the desired configuration
         # os.chdir(GEANT_dir)
