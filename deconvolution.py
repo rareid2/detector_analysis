@@ -354,6 +354,41 @@ class Deconvolution:
 
         return resolved
 
+    def plot_signal_on_distribution(self,fov_deg, save_name = 'sine_comparison'):
+
+        # get max signal
+        self.signal = np.sum(self.raw_heatmap, axis=0)
+        max_signal = np.amax(self.signal)
+
+        # rescale x axis to fov
+        xx = np.radians(fov_deg) * np.arange(0, self.multiplier) / self.multiplier
+        xx = [x + np.radians(90-(fov_deg/2)) for x in xx]
+
+        # plot normalized signal 
+        plt.plot(xx, self.signal / max_signal, "#EA526F",label='signal')
+
+        # plot distribution -- sine
+        time = np.arange(0, np.pi, 0.01)
+        # amplitude of the sine wave is sine of a variable like time
+        amplitude = np.sin(time)
+        plt.plot(time, amplitude, "#070600",label='sine dist.')
+        plt.fill_between(
+            time,
+            amplitude,
+            0,
+            where=(time >= np.radians(90-(fov_deg/2))) & (time < np.radians(90+(fov_deg/2))),
+            color="#23B5D3",
+            alpha=0.4,
+            label='FOV'
+        )
+
+        # plot 
+        plt.legend()
+        plt.xlim([0, np.pi])
+        plt.ylim([0, 1.1])
+        plt.savefig("../results/pinhole/%s.png" %(save_name), dpi=300)
+        plt.close()
+
 
 def shift(m, hs, vs):
     """
