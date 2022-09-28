@@ -25,7 +25,7 @@ def write_angle_beam_macro(
     mf = "run_angle_beam.mac"
     macro_path = os.path.join(macro_directory, mf)
     with open(macro_path, "w") as f:
-        #f.write("/run/numberOfThreads 40 \n")
+        # f.write("/run/numberOfThreads 40 \n")
         f.write("/run/initialize \n")
         f.write("/control/verbose 0 \n")
         f.write("/run/verbose 0 \n")
@@ -69,7 +69,7 @@ def write_pt_macro(
     macro_path = os.path.join(macro_directory, mf)
 
     with open(macro_path, "w") as f:
-        #f.write("/run/numberOfThreads 40 \n")
+        # f.write("/run/numberOfThreads 40 \n")
         f.write("/run/initialize \n")
         f.write("/control/verbose 0 \n")
         f.write("/run/verbose 0 \n")
@@ -185,3 +185,57 @@ def find_disp_pos(theta: float, z_disp: float) -> float:
     x_disp = z_disp * np.tan(np.deg2rad(theta))
 
     return x_disp
+
+
+def write_sphere_macro(
+    n_particles: int,
+    radius_cm: float,
+    ene_type: str,
+    ene_min_keV: float,
+    ene_max_keV: float,
+    macro_directory: str = "/home/rileyannereid/workspace/geant4/EPAD_geant4/macros",
+) -> None:
+    """
+    create macro file for a point source (or multiple point sources)
+
+    params:
+        n_particles:  number of particles to run
+        radius_cm: radius of simulation sphere in cm
+        ene_type: energy distribution type (see GPS geant)
+        ene_min_keV: min energy for distribution type
+        ene_max_keV: max energy for distribution type
+    returns:
+    """
+
+    mf = "run_sphere.mac"
+    macro_path = os.path.join(macro_directory, mf)
+
+    with open(macro_path, "w") as f:
+        f.write("/run/initialize \n")
+        f.write("/control/verbose 0 \n")
+        f.write("/run/verbose 0 \n")
+        f.write("/event/verbose 0 \n")
+        f.write("/tracking/verbose 0 \n")
+
+        f.write("/gps/particle e- \n")
+        f.write("/gps/pos/type Surface \n")
+        f.write("/gps/pos/shape Sphere \n")
+        f.write("/gps/pos/radius %.2f cm \n" % radius_cm)
+
+        # center chosen to align with pinhole (maybe change this?)
+        f.write("/gps/pos/centre 0 0 498.5 cm \n")
+
+        f.write("/gps/ang/type cos \n")
+        f.write("/gps/ang/mintheta 0 deg \n")
+        f.write("/gps/ang/maxtheta 90 deg \n")
+
+        f.write("/gps/ene/type %s \n" % ene_type)
+        f.write("/gps/ene/min %.2f keV \n" % ene_min_keV)
+        f.write("/gps/ene/max %.2f keV \n" % ene_max_keV)
+
+        f.write("/run/beamOn %d \n" % n_particles)
+
+    f.close()
+    print("wrote ", macro_path)
+
+    return mf

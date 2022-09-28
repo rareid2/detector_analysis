@@ -1,5 +1,10 @@
 from config import write_det_config, write_ca_config
-from macros import write_angle_beam_macro, write_PAD_macro, write_pt_macro
+from macros import (
+    write_angle_beam_macro,
+    write_PAD_macro,
+    write_pt_macro,
+    write_sphere_macro,
+)
 
 import os
 
@@ -83,7 +88,7 @@ class SimulationEngine:
         else:
             ms = mask_size
         self.mask_size = ms
-        
+
         # define aperture filename
         self.aperture_filename = "%d%sMURA_matrix_%.2f.txt" % (
             rr,
@@ -166,6 +171,8 @@ class SimulationEngine:
         positions=[[0, 0, -500]],
         directions=[0],
         PAD_run: int = 1,
+        sphere: bool = False,
+        radius_cm: float = 25,
     ) -> None:
         """
         create macro file based on simulation type -- see macros.py for function defs
@@ -181,7 +188,15 @@ class SimulationEngine:
                 )
                 # update energy
                 self.energy_keV = energy_keV
-            elif self.construct == "CA" and self.source == "PS":
+            elif self.construct == "CA" and self.source == "PS" and sphere:
+                macro_file = write_sphere_macro(
+                    n_particles=n_particles,
+                    radius_cm=radius_cm,
+                    ene_type=energy_keV[0],
+                    ene_min_keV=energy_keV[1],
+                    ene_max_keV=energy_keV[2],
+                )
+            elif self.construct == "CA" and self.source == "PS" and sphere == False:
                 macro_file = write_pt_macro(
                     n_particles=n_particles,
                     positions=positions,
