@@ -20,6 +20,7 @@ class Deconvolution:
         self.n_elements = simulation_engine.n_elements
         self.mura_elements = simulation_engine.mura_elements
         self.element_size_mm = simulation_engine.element_size_mm
+        self.n_pixels = 256
 
         return
 
@@ -41,7 +42,7 @@ class Deconvolution:
 
         return
 
-    def get_raw(self) -> NDArray[np.uint16]:
+    def get_raw(self, trim=None) -> NDArray[np.uint16]:
         """
         get raw hits and 2d histogram
 
@@ -54,9 +55,16 @@ class Deconvolution:
         yxes = [p[1] for p in self.hits_dict["Position"]]
 
         # get heatmap
-        heatmap, xedges, yedges = np.histogram2d(
-            xxes, yxes, bins=self.multiplier * self.mura_elements
-        )
+        heatmap, xedges, yedges = np.histogram2d(xxes, yxes, bins=self.n_pixels)
+
+        # get rid of the edges
+        if trim:
+            trim_start = list(np.linspace(0, trim - 1, trim))
+            trim_end = list(np.linspace(len(heatmap) - trim, len(heatmap) - 1, trim))
+            trim_list = trim_start + trim_end
+            trim_list = [int(lt) for lt in trim_list]
+            heatmap = np.delete(heatmap, trim_list, 0)
+            heatmap = np.delete(heatmap, trim_list, 1)
 
         self.raw_heatmap = heatmap
 
@@ -114,7 +122,11 @@ class Deconvolution:
             decoder: 2d numpy array of decoding array, inverse of mask
         """
 
-        if self.mura_elements == 67 or self.mura_elements == 31:
+        if (
+            self.mura_elements == 67
+            or self.mura_elements == 31
+            or self.mura_elements == 11
+        ):
             check = 0
         else:
             check = 1
@@ -267,7 +279,8 @@ class Deconvolution:
 
     def deconvolve(
         self,
-        multiplier: int,
+        multiplier: int = 1,
+        trim: int = None,
         plot_raw_heatmap: False = bool,
         save_raw_heatmap: str = "raw_hits_heatmap.png",
         plot_deconvolved_heatmap: bool = False,
@@ -305,7 +318,7 @@ class Deconvolution:
         self.shift_pos()
 
         # get heatmap
-        self.get_raw()
+        self.get_raw(trim)
 
         if plot_raw_heatmap:
             self.plot_heatmap(self.raw_heatmap, save_name=save_raw_heatmap, vmax=vmax)
@@ -343,7 +356,7 @@ class Deconvolution:
 
         # self.signal = np.fliplr(self.deconvolved_image)[:, int(max_col)]
         # self.signal = np.fliplr(self.deconvolved_image)[:, 536]
-        self.signal = np.sum(self.deconvolved_image, axis=0)
+        self.signal = np.sum(self.deconvolved_image, axis=1)
 
         if plot_signal_peak:
             resolved = self.plot_peak(save_peak, plot_conditions, condition)
@@ -354,7 +367,7 @@ class Deconvolution:
 
         return resolved
 
-    def plot_signal_on_distribution(self,fov_deg, save_name = 'sine_comparison'):
+    def plot_signal_on_distribution(self, fov_deg, save_name="sine_comparison"):
 
         # get max signal
         self.signal = np.sum(self.raw_heatmap, axis=0)
@@ -362,31 +375,32 @@ class Deconvolution:
 
         # rescale x axis to fov
         xx = np.radians(fov_deg) * np.arange(0, self.multiplier) / self.multiplier
-        xx = [x + np.radians(90-(fov_deg/2)) for x in xx]
+        xx = [x + np.radians(90 - (fov_deg / 2)) for x in xx]
 
-        # plot normalized signal 
-        plt.plot(xx, self.signal / max_signal, "#EA526F",label='signal')
+        # plot normalized signal
+        plt.plot(xx, self.signal / max_signal, "#EA526F", label="signal")
 
         # plot distribution -- sine
         time = np.arange(0, np.pi, 0.01)
         # amplitude of the sine wave is sine of a variable like time
         amplitude = np.sin(time)
-        plt.plot(time, amplitude, "#070600",label='sine dist.')
+        plt.plot(time, amplitude, "#070600", label="sine dist.")
         plt.fill_between(
             time,
             amplitude,
             0,
-            where=(time >= np.radians(90-(fov_deg/2))) & (time < np.radians(90+(fov_deg/2))),
+            where=(time >= np.radians(90 - (fov_deg / 2)))
+            & (time < np.radians(90 + (fov_deg / 2))),
             color="#23B5D3",
             alpha=0.4,
-            label='FOV'
+            label="FOV",
         )
 
-        # plot 
+        # plot
         plt.legend()
         plt.xlim([0, np.pi])
         plt.ylim([0, 1.1])
-        plt.savefig("../results/pinhole/%s.png" %(save_name), dpi=300)
+        plt.savefig("../results/pinhole/%s.png" % (save_name), dpi=300)
         plt.close()
 
 
