@@ -51,7 +51,7 @@ def write_pt_macro(
     positions: List,
     rotations: List,
     energies_keV: List,
-    world_size: float,
+    detector_placement: float,
     macro_directory: str = "/home/rileyannereid/workspace/geant4/EPAD_geant4/macros",
 ) -> None:
     """
@@ -87,15 +87,14 @@ def write_pt_macro(
             # if rotation = 1 calculate direction required to point source at center of detector
             if rot != 0:
 
-                detector_loc = np.array([0, 0, world_size * 0.45])
+                detector_loc = np.array([0, 0, detector_placement])
                 src = np.array(pos)
                 norm_d = np.linalg.norm(detector_loc - src)
                 normal = (detector_loc - src) / norm_d
-
-                z_ax = np.array([0, 0, 1])
+                y_ax = np.array([0, 1, 0])
 
                 # found on a reddit forum to get geant to cooperate
-                xprime = np.cross(normal, z_ax)
+                xprime = np.cross(normal, y_ax)
                 xprime_normd = xprime / np.linalg.norm(xprime)
                 yprime = np.cross(normal, xprime_normd)
                 yprime_normd = yprime / np.linalg.norm(yprime)
@@ -121,7 +120,7 @@ def write_pt_macro(
             f.write("/gps/ang/type iso \n")
             f.write("/gps/ang/mintheta 0 deg \n")
             f.write("/gps/ang/maxtheta 0.23 deg \n")
-            # f.write('/gps/ang/maxtheta 0.08 deg \n')
+            #f.write('/gps/ang/maxtheta 0.08 deg \n')
             f.write("/gps/ang/minphi 0 deg \n")
             f.write("/gps/ang/maxphi 360 deg \n")
             f.write("/gps/energy " + str(ene) + " keV \n")

@@ -202,7 +202,7 @@ class SimulationEngine:
                     positions=positions,
                     rotations=directions,
                     energies_keV=energy_keV,
-                    world_size=self.world_sizeZ,
+                    detector_placement=self.detector_placement,
                 )
             else:
                 macro_file = write_PAD_macro(
