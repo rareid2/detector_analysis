@@ -21,6 +21,7 @@ class Deconvolution:
         self.mura_elements = simulation_engine.mura_elements
         self.element_size_mm = simulation_engine.element_size_mm
         self.n_pixels = 256
+        self.pixel_size = 0.055  # mm
 
         return
 
@@ -126,6 +127,7 @@ class Deconvolution:
             self.mura_elements == 67
             or self.mura_elements == 31
             or self.mura_elements == 11
+            or self.mura_elements == 7
         ):
             check = 0
         else:
@@ -357,6 +359,9 @@ class Deconvolution:
         # self.signal = np.fliplr(self.deconvolved_image)[:, int(max_col)]
         # self.signal = np.fliplr(self.deconvolved_image)[:, 536]
         self.signal = np.sum(self.deconvolved_image, axis=1)
+        self.max_signal_over_noise = np.amax(self.signal) - np.mean(
+            self.signal[0 : len(self.signal) // 4]
+        )
 
         if plot_signal_peak:
             resolved = self.plot_peak(save_peak, plot_conditions, condition)
@@ -366,6 +371,46 @@ class Deconvolution:
             resolved = None
 
         return resolved
+
+    def plot_flux_signal(self, simulation_engine, fname):
+        # calculate incident flux assuming isotropic
+        j = simulation_engine.n_particles / (
+            4 * np.pi**2 * simulation_engine.radius_cm**2
+        )
+        # units are [cm^-2 s^-1 sr^-1]
+        counts = np.sum(self.raw_heatmap)
+        geom_factor = counts / j
+
+        flux_inst = self.raw_heatmap * geom_factor
+        pad = np.sum(flux_inst, 1)
+        plt.clf()
+
+        # need to convert x axis from pixels to angle
+        x_axis = np.linspace(0, len(pad) - 1, len(pad)) - len(pad) / 2
+        angle = np.rad2deg(
+            np.arctan((x_axis * self.pixel_size) / (simulation_engine.mask_gap_cm * 10))
+        )
+
+        plt.scatter(angle, pad, color="#A2E3C4")
+        plt.errorbar(
+            angle,
+            pad,
+            xerr=np.rad2deg(
+                np.arctan(
+                    (simulation_engine.element_size_mm)
+                    / (simulation_engine.mask_gap_cm * 10)
+                )
+            ),
+            color="#A2E3C4",
+            fmt="o",
+        )
+
+        ax = plt.gca()
+        ax.set_yscale("log")
+        #ax.set_ylim([1, 1e4])
+        ax.set_ylabel("flux [/cm^2 s sr]")
+        ax.set_xlabel("polar angle")
+        plt.savefig(fname)
 
     def plot_signal_on_distribution(self, fov_deg, save_name="sine_comparison"):
 

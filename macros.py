@@ -120,11 +120,11 @@ def write_pt_macro(
             f.write("/gps/ang/type iso \n")
             f.write("/gps/ang/mintheta 0 deg \n")
             f.write("/gps/ang/maxtheta 0.23 deg \n")
-            #f.write('/gps/ang/maxtheta 0.08 deg \n')
+            # f.write('/gps/ang/maxtheta 0.08 deg \n')
             f.write("/gps/ang/minphi 0 deg \n")
             f.write("/gps/ang/maxphi 360 deg \n")
             f.write("/gps/energy " + str(ene) + " keV \n")
-            f.write("/run/beamOn " + str(n_particles) + "\n")
+            f.write("/run/beamOn " + str(int(n_particles)) + "\n")
 
     f.close()
     print("wrote ", macro_path)
@@ -229,10 +229,13 @@ def write_sphere_macro(
         f.write("/gps/ang/maxtheta 90 deg \n")
 
         f.write("/gps/ene/type %s \n" % ene_type)
-        f.write("/gps/ene/min %.2f keV \n" % ene_min_keV)
-        f.write("/gps/ene/max %.2f keV \n" % ene_max_keV)
+        if ene_type == "Mono":
+            f.write("/gps/ene/mono %2.f keV \n" % ene_min_keV)
+        else:
+            f.write("/gps/ene/min %.2f keV \n" % ene_min_keV)
+            f.write("/gps/ene/max %.2f keV \n" % ene_max_keV)
 
-        f.write("/run/beamOn %d \n" % n_particles)
+        f.write("/run/beamOn %d \n" % int(n_particles))
 
     f.close()
     print("wrote ", macro_path)
