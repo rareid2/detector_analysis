@@ -180,25 +180,28 @@ class SimulationEngine:
         params:
         returns:
         """
+        # assign for later use
+        self.n_particles = n_particles
+        self.radius_cm = radius_cm
 
         if self.write_files:
             if self.construct == "TD" and self.source == "PS":
                 macro_file = write_angle_beam_macro(
-                    n_particles=n_particles, energy_keV=energy_keV
+                    n_particles=self.n_particles, energy_keV=energy_keV
                 )
                 # update energy
                 self.energy_keV = energy_keV
             elif self.construct == "CA" and self.source == "PS" and sphere:
                 macro_file = write_sphere_macro(
                     n_particles=n_particles,
-                    radius_cm=radius_cm,
+                    radius_cm=self.radius_cm,
                     ene_type=energy_keV[0],
                     ene_min_keV=energy_keV[1],
                     ene_max_keV=energy_keV[2],
                 )
             elif self.construct == "CA" and self.source == "PS" and sphere == False:
                 macro_file = write_pt_macro(
-                    n_particles=n_particles,
+                    n_particles=self.n_particles,
                     positions=positions,
                     rotations=directions,
                     energies_keV=energy_keV,
@@ -206,7 +209,7 @@ class SimulationEngine:
                 )
             else:
                 macro_file = write_PAD_macro(
-                    n_particles=n_particles,
+                    n_particles=self.n_particles,
                     PAD_run=PAD_run,
                     folding_energy_keV=energy_keV,
                 )
