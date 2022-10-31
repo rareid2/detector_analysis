@@ -372,7 +372,7 @@ class Deconvolution:
 
         return resolved
 
-    def plot_flux_signal(self, simulation_engine, fname):
+    def plot_flux_signal(self, ax, simulation_engine, fname):
         # calculate incident flux assuming isotropic
         j = simulation_engine.n_particles / (
             4 * np.pi**2 * simulation_engine.radius_cm**2
@@ -383,7 +383,7 @@ class Deconvolution:
 
         flux_inst = self.raw_heatmap * geom_factor
         pad = np.sum(flux_inst, 1)
-        plt.clf()
+        #plt.clf()
 
         # need to convert x axis from pixels to angle
         x_axis = np.linspace(0, len(pad) - 1, len(pad)) - len(pad) / 2
@@ -391,7 +391,7 @@ class Deconvolution:
             np.arctan((x_axis * self.pixel_size) / (simulation_engine.mask_gap_cm * 10))
         )
 
-        plt.scatter(angle, pad, color="#A2E3C4")
+        ax.scatter(angle, pad, color="#A2E3C4")
         plt.errorbar(
             angle,
             pad,
@@ -407,10 +407,11 @@ class Deconvolution:
 
         ax = plt.gca()
         ax.set_yscale("log")
-        #ax.set_ylim([1, 1e4])
+        ax.set_ylim([1, 1e4])
         ax.set_ylabel("flux [/cm^2 s sr]")
         ax.set_xlabel("polar angle")
-        plt.savefig(fname)
+        #plt.show()
+        #plt.savefig(fname)
 
     def plot_signal_on_distribution(self, fov_deg, save_name="sine_comparison"):
 
