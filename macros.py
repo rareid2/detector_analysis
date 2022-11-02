@@ -82,16 +82,17 @@ def write_pt_macro(
 
             f.write("/gps/particle e- \n")
             f.write("/gps/pos/type Plane \n")
-            f.write("/gps/pos/shape Circle \n")
+            f.write("/gps/pos/shape Square \n")
             f.write("/gps/pos/centre " + pos_string + " cm \n")
 
+            # calculate for theta size
+            src = np.array(pos)
+            detector_loc = np.array([0, 0, detector_placement])
+            norm_d = np.linalg.norm(detector_loc - src)
+            normal = (detector_loc - src) / norm_d
             # if rotation = 1 calculate direction required to point source at center of detector
             if rot != 0:
 
-                detector_loc = np.array([0, 0, detector_placement])
-                src = np.array(pos)
-                norm_d = np.linalg.norm(detector_loc - src)
-                normal = (detector_loc - src) / norm_d
                 y_ax = np.array([0, 1, 0])
 
                 # found on a reddit forum to get geant to cooperate
@@ -120,8 +121,11 @@ def write_pt_macro(
 
             f.write("/gps/ang/type iso \n")
             f.write("/gps/ang/mintheta 0 deg \n")
-            f.write("/gps/ang/maxtheta 0.15 deg \n")
-            # f.write('/gps/ang/maxtheta 0.08 deg \n')
+            
+            # find max theta
+            maxtheta = np.rad2deg(2 * np.arctan((1.408 / 2)/ norm_d))
+            f.write("/gps/ang/maxtheta %f deg \n" % maxtheta)
+            
             f.write("/gps/ang/minphi 0 deg \n")
             f.write("/gps/ang/maxphi 360 deg \n")
             f.write("/gps/energy " + str(ene) + " keV \n")
