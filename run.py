@@ -30,15 +30,15 @@ mosaic = True
 # -------------------------------------
 
 # -------- pinhole set up -------------
-"""
+
 rank = 1
-element_size = 1.76 # mm
-pixels_downsample = int(element_size / pixel)
+element_size = 1.76/2 # mm
+pixels_downsample = int(10 * det_size_cm / (2 * element_size))
 n_elements = rank
-mask_size = det_size_cm
+mask_size = det_size_cm * 10 # convert to mm
 trim = None
 mosaic = False
-"""
+
 # -------------------------------------
 
 # thickness of mask
@@ -86,7 +86,7 @@ simulation_engine.set_macro(
 )
 
 # --------------set up data naming---------------
-fname_tag = 'bleh'
+fname_tag = 'pinhole_confirm'
 fname = "../data/timepix_sim/%s_%d_%s_%d.csv" % (
     fname_tag,
     n_particles,
@@ -95,7 +95,7 @@ fname = "../data/timepix_sim/%s_%d_%s_%d.csv" % (
 )
 
 # --------------RUN---------------
-#simulation_engine.run_simulation(fname, build=True)
+simulation_engine.run_simulation(fname, build=True)
 
 # ---------- process results -----------
 myhits = Hits(simulation_engine, fname)
