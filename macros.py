@@ -53,6 +53,7 @@ def write_pt_macro(
     energies_keV: List,
     detector_placement: float,
     macro_directory: str = "/home/rileyannereid/workspace/geant4/EPAD_geant4/macros",
+    progress_mod: int = 1000,
 ) -> None:
     """
     create macro file for a point source (or multiple point sources)
@@ -119,11 +120,12 @@ def write_pt_macro(
 
             f.write("/gps/ang/type iso \n")
             f.write("/gps/ang/mintheta 0 deg \n")
-            f.write("/gps/ang/maxtheta 0.23 deg \n")
+            f.write("/gps/ang/maxtheta 0.15 deg \n")
             # f.write('/gps/ang/maxtheta 0.08 deg \n')
             f.write("/gps/ang/minphi 0 deg \n")
             f.write("/gps/ang/maxphi 360 deg \n")
             f.write("/gps/energy " + str(ene) + " keV \n")
+            f.write("/run/printProgress %d \n" % int(progress_mod))
             f.write("/run/beamOn " + str(int(n_particles)) + "\n")
 
     f.close()
@@ -193,6 +195,7 @@ def write_sphere_macro(
     ene_min_keV: float,
     ene_max_keV: float,
     macro_directory: str = "/home/rileyannereid/workspace/geant4/EPAD_geant4/macros",
+    progress_mod: int = 1000,
 ) -> None:
     """
     create macro file for a point source (or multiple point sources)
@@ -235,6 +238,8 @@ def write_sphere_macro(
             f.write("/gps/ene/min %.2f keV \n" % ene_min_keV)
             f.write("/gps/ene/max %.2f keV \n" % ene_max_keV)
 
+        # get a progress bar
+        f.write("/run/printProgress %d \n" % int(progress_mod))
         f.write("/run/beamOn %d \n" % int(n_particles))
 
     f.close()

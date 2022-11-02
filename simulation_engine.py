@@ -173,6 +173,7 @@ class SimulationEngine:
         PAD_run: int = 1,
         sphere: bool = False,
         radius_cm: float = 25,
+        progress_mod: int = 1000,
     ) -> None:
         """
         create macro file based on simulation type -- see macros.py for function defs
@@ -198,6 +199,7 @@ class SimulationEngine:
                     ene_type=energy_keV[0],
                     ene_min_keV=energy_keV[1],
                     ene_max_keV=energy_keV[2],
+                    progress_mod=progress_mod
                 )
             elif self.construct == "CA" and self.source == "PS" and sphere == False:
                 macro_file = write_pt_macro(
@@ -206,6 +208,7 @@ class SimulationEngine:
                     rotations=directions,
                     energies_keV=energy_keV,
                     detector_placement=self.detector_placement,
+                    progress_mod=progress_mod,
                 )
             else:
                 macro_file = write_PAD_macro(
