@@ -20,8 +20,8 @@ class Deconvolution:
         self.n_elements = simulation_engine.n_elements
         self.mura_elements = simulation_engine.mura_elements
         self.element_size_mm = simulation_engine.element_size_mm
-        self.n_pixels = 256
-        self.pixel_size = 0.055  # mm
+        self.n_pixels = 256 # keep constant for timepix detector
+        self.pixel_size = 0.0055  # cm # keep constant for timepix detector
 
         return
 
@@ -37,13 +37,29 @@ class Deconvolution:
         pos_p = self.hits_dict["Position"]
         shift = self.det_size_cm / 2
 
-        # update position to shifted so origin is lower left corner
+        # update position to shifted so origin is lower left corner (instead of center of detector)
         pos = [(pp[0] + shift, pp[1] + shift) for pp in pos_p]
-        self.hits_dict["Position"] = pos
+
+        if self.trim:
+            # trim the edges (remove hits that are in the trimmed portion)
+            pos_trimmed = []
+
+            for pp in pos:
+                if pp[0] <= (self.trim*self.pixel_size) or pp[0] >= (self.det_size_cm - (self.trim*self.pixel_size)):
+                    continue
+                elif pp[1] <= (self.trim*self.pixel_size) or pp[1] >= (self.det_size_cm - (self.trim*self.pixel_size)):
+                    continue
+                else:
+                    pos_trimmed.append(pp)
+
+            # replace with shifted and trimmed
+            self.hits_dict["Position"] = pos_trimmed
+        else:
+            self.hits_dict["Position"] = pos
 
         return
 
-    def get_raw(self, trim=None) -> NDArray[np.uint16]:
+    def get_raw(self) -> NDArray[np.uint16]:
         """
         get raw hits and 2d histogram
 
@@ -56,16 +72,10 @@ class Deconvolution:
         yxes = [p[1] for p in self.hits_dict["Position"]]
 
         # get heatmap
-        heatmap, xedges, yedges = np.histogram2d(xxes, yxes, bins=self.n_pixels)
-
-        # get rid of the edges
-        if trim:
-            trim_start = list(np.linspace(0, trim - 1, trim))
-            trim_end = list(np.linspace(len(heatmap) - trim, len(heatmap) - 1, trim))
-            trim_list = trim_start + trim_end
-            trim_list = [int(lt) for lt in trim_list]
-            heatmap = np.delete(heatmap, trim_list, 0)
-            heatmap = np.delete(heatmap, trim_list, 1)
+        if self.trim:
+            heatmap, xedges, yedges = np.histogram2d(xxes, yxes, bins=int( (self.n_pixels-(self.trim*2))  / self.downsample) )
+        else:
+            heatmap, xedges, yedges = np.histogram2d(xxes, yxes, bins=int(self.downsample)) # just for the pinhole case - remove extra
 
         self.raw_heatmap = heatmap
 
@@ -136,9 +146,9 @@ class Deconvolution:
         decoder = get_decoder_MURA(
             self.mask, self.mura_elements, holes_inv=False, check=check
         )
-        decoder = np.repeat(decoder, self.multiplier, axis=1).repeat(
-            self.multiplier, axis=0
-        )
+        #decoder = np.repeat(decoder, self.n_pixels, axis=1).repeat(
+        #    self.n_pixels, axis=0
+        #)
 
         self.decoder = decoder
 
@@ -281,7 +291,7 @@ class Deconvolution:
 
     def deconvolve(
         self,
-        multiplier: int = 1,
+        downsample: int = None,
         trim: int = None,
         plot_raw_heatmap: False = bool,
         save_raw_heatmap: str = "raw_hits_heatmap.png",
@@ -298,7 +308,7 @@ class Deconvolution:
         perform all the steps to deconvolve a raw image
 
         params:
-            multiplier:               ??????
+            downsample:               ??????
             plot_raw_heatmap:         option to plot a heatmap of raw signal
             save_raw_heatmap:         name to save figure as for raw image
             plot_deconvolved_heatmap: option to plot a heatmap of deconvolved signal
@@ -314,13 +324,14 @@ class Deconvolution:
             resolved:                 true or false if the peaks are resolved based on input condition
         """
 
-        self.multiplier = multiplier
+        self.downsample = downsample
+        self.trim = trim
 
-        # shift origin
+        # shift origin and remove unused pixels
         self.shift_pos()
 
         # get heatmap
-        self.get_raw(trim)
+        self.get_raw()
 
         if plot_raw_heatmap:
             self.plot_heatmap(self.raw_heatmap, save_name=save_raw_heatmap, vmax=vmax)
@@ -371,7 +382,9 @@ class Deconvolution:
             resolved = None
 
         return resolved
-
+   
+    
+    """ # TODO! move these to a new script 
     def plot_flux_signal(self, ax, simulation_engine, fname):
         # calculate incident flux assuming isotropic
         j = simulation_engine.n_particles / (
@@ -413,6 +426,7 @@ class Deconvolution:
         #plt.show()
         #plt.savefig(fname)
 
+
     def plot_signal_on_distribution(self, fov_deg, save_name="sine_comparison"):
 
         # get max signal
@@ -448,7 +462,7 @@ class Deconvolution:
         plt.ylim([0, 1.1])
         plt.savefig("../results/pinhole/%s.png" % (save_name), dpi=300)
         plt.close()
-
+    """
 
 def shift(m, hs, vs):
     """
