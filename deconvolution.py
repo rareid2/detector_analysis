@@ -289,6 +289,12 @@ class Deconvolution:
 
         return resolved
 
+    def FWHM(self):
+        from scipy.signal import peak_widths
+        # just find the width of the center peak
+        results_half = peak_widths(self.signal, [5], rel_height=0.5) 
+        return results_half[0][0]
+
     def deconvolve(
         self,
         downsample: int = None,
@@ -369,7 +375,9 @@ class Deconvolution:
 
         # self.signal = np.fliplr(self.deconvolved_image)[:, int(max_col)]
         # self.signal = np.fliplr(self.deconvolved_image)[:, 536]
-        self.signal = np.sum(self.deconvolved_image, axis=1)
+        # self.signal = np.sum(self.deconvolved_image, axis=1)
+        # normalize it
+        self.signal = np.divide(self.deconvolved_image[np.shape(self.deconvolved_image)[0]//2,:], np.max(self.deconvolved_image[np.shape(self.deconvolved_image)[0]//2,:]))
         self.max_signal_over_noise = np.amax(self.signal) - np.mean(
             self.signal[0 : len(self.signal) // 4]
         )
