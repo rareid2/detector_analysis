@@ -27,7 +27,7 @@ class SimulationEngine:
         self.world_sizeXY = 1.1 * self.env_sizeXY
         self.world_sizeZ = 1.1 * self.env_sizeZ
         self.world_offset = self.env_sizeZ * 0.45
-        self.detector_placement = 0 # self.world_offset  # im cm
+        self.detector_placement = self.world_offset  # im cm
 
     def det_config(
         self,
