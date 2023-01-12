@@ -73,7 +73,9 @@ class Deconvolution:
 
         # get heatmap
         if self.trim:
-            heatmap, xedges, yedges = np.histogram2d(xxes, yxes, bins=int( (self.n_pixels-(self.trim*2))  / self.downsample) )
+            # if downsampling to number of MURA elements
+            #heatmap, xedges, yedges = np.histogram2d(xxes, yxes, bins=int( (self.n_pixels-(self.trim*2))  / self.downsample) )
+            heatmap, xedges, yedges = np.histogram2d(xxes, yxes, bins=int( (self.n_pixels-(self.trim*2))))
         else:
             heatmap, xedges, yedges = np.histogram2d(xxes, yxes, bins=int(self.downsample)) # just for the pinhole case - remove extra
 
@@ -146,9 +148,11 @@ class Deconvolution:
         decoder = get_decoder_MURA(
             self.mask, self.mura_elements, holes_inv=False, check=check
         )
-        #decoder = np.repeat(decoder, self.n_pixels, axis=1).repeat(
-        #    self.n_pixels, axis=0
-        #)
+
+        # comment this out if NOT downsampling!
+        decoder = np.repeat(decoder, self.n_pixels, axis=1).repeat(
+            self.n_pixels, axis=0
+        )
 
         self.decoder = decoder
 
@@ -369,15 +373,16 @@ class Deconvolution:
 
         # get max signal (point sources usually)
         max_ind = np.where(self.deconvolved_image == np.amax(self.deconvolved_image))
-        max_col = max_ind[1]
-        if np.shape(max_col)[0] > 1:
-            max_col = max_col[0]
+        max_col = int(max_ind[0])
+        #if np.shape(max_col)[0] > 1:
+        #    max_col = max_col[0]
 
         # self.signal = np.fliplr(self.deconvolved_image)[:, int(max_col)]
         # self.signal = np.fliplr(self.deconvolved_image)[:, 536]
         # self.signal = np.sum(self.deconvolved_image, axis=1)
-        # normalize it
-        self.signal = np.divide(self.deconvolved_image[np.shape(self.deconvolved_image)[0]//2,:], np.max(self.deconvolved_image[np.shape(self.deconvolved_image)[0]//2,:]))
+        # normalized signal
+        #self.signal = np.divide(self.deconvolved_image[np.shape(self.deconvolved_image)[0]//2,:], np.max(self.deconvolved_image[np.shape(self.deconvolved_image)[0]//2,:]))
+        self.signal = self.deconvolved_image[max_col,:]
         self.max_signal_over_noise = np.amax(self.signal) - np.mean(
             self.signal[0 : len(self.signal) // 4]
         )
@@ -389,7 +394,7 @@ class Deconvolution:
         else:
             resolved = None
 
-        return resolved
+        return resolved, self.max_signal_over_noise
    
     
     """ # TODO! move these to a new script 
