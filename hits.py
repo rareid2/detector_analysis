@@ -5,17 +5,18 @@ from simulation_engine import SimulationEngine
 
 
 class Hits:
-    def __init__(self, simulation_engine: SimulationEngine, fname: str) -> None:
+    def __init__(self, simulation_engine: SimulationEngine, fname: str, experiment_geant4: bool = False) -> None:
 
         # filename containing hits data
         self.fname = fname
 
         # parse the hits
-        self.detector_hits = pd.read_csv(
+        # geant experiment is set up in a new coordinate system
+        if experiment:
+            self.detector_hits = pd.read_csv(
             self.fname,
-            names=["det", "x", "y", "z", "energy"],
+            names=["x", "y", "z", "energy"],
             dtype={
-                "det": np.int8,
                 "x": np.float64,
                 "y": np.float64,
                 "z": np.float64,
@@ -24,9 +25,27 @@ class Hits:
             delimiter=",",
             on_bad_lines="skip",
             engine="c",
-        )
+            )
+            self.n_entries = len(self.detector_hits["energy"])
+        
+        # general geant4 simulations
+        else:
+            self.detector_hits = pd.read_csv(
+                self.fname,
+                names=["det", "x", "y", "z", "energy"],
+                dtype={
+                    "det": np.int8,
+                    "x": np.float64,
+                    "y": np.float64,
+                    "z": np.float64,
+                    "energy": np.float64,
+                },
+                delimiter=",",
+                on_bad_lines="skip",
+                engine="c",
+            )
 
-        self.n_entries = len(self.detector_hits["det"])
+            self.n_entries = len(self.detector_hits["det"])
 
         if self.n_entries == 0:
             raise ValueError("No particles hits on any detector!")
@@ -111,7 +130,7 @@ class Hits:
         print("processed detector hits")
 
         return hits_dict
-
+    # get hits for generalized setup in geant4
     def get_det_hits(self) -> dict:
         """
         return a dictionary containing hits on front detector
@@ -135,6 +154,38 @@ class Hits:
                 posX.append(xpos)
                 posY.append(zpos)
                 energies.append(energy_kev)
+
+        hits_pos = [(X, Y) for X, Y in zip(posX, posY)]
+
+        hits_dict = {"Position": hits_pos, "Energy": energies}
+
+        self.hits_dict = hits_dict
+
+        print("processed detector hits")
+
+        return hits_dict
+    # get hits simulated in experiment set up in geant4
+    def get_experiment_geant4_hits(self) -> dict:
+        """
+        return a dictionary containing hits on Minipix EDU from simulated detector in geant4
+
+        params:
+        returns:
+            hits_dict: contains positions of hits, also has energies
+        """
+
+        posX = []
+        posY = []
+        energies = []
+        for count in range(len(self.detector_hits["energy"])-1):
+            xpos = self.detector_hits["x"][count]
+            zpos = self.detector_hits["z"][count]
+            energy_kev = self.detector_hits["energy"][count]
+
+            # save
+            posX.append(xpos)
+            posY.append(zpos)
+            energies.append(energy_kev)
 
         hits_pos = [(X, Y) for X, Y in zip(posX, posY)]
 
