@@ -13,15 +13,28 @@ from util_fncs import makeMURA, make_mosaic_MURA, get_decoder_MURA
 
 
 class Deconvolution:
-    def __init__(self, hits: Hits, simulation_engine: SimulationEngine) -> None:
+    def __init__(
+        self,
+        hits: Hits = None,
+        simulation_engine: SimulationEngine = None,
+        experiment_data: NDArray[np.uint16] = None,
+    ) -> None:
 
-        self.hits_dict = hits.hits_dict
-        self.det_size_cm = simulation_engine.det_size_cm
-        self.n_elements = simulation_engine.n_elements
-        self.mura_elements = simulation_engine.mura_elements
-        self.element_size_mm = simulation_engine.element_size_mm
-        self.n_pixels = 256 # keep constant for timepix detector
-        self.pixel_size = 0.0055  # cm # keep constant for timepix detector
+        if simulation_engine is not None:
+            self.hits_dict = hits.hits_dict
+            self.det_size_cm = simulation_engine.det_size_cm
+            self.n_elements = simulation_engine.n_elements
+            self.mura_elements = simulation_engine.mura_elements
+            self.element_size_mm = simulation_engine.element_size_mm
+            self.n_pixels = 256  # keep constant for timepix detector
+            self.pixel_size = 0.0055  # cm # keep constant for timepix detector
+        else:
+            self.experiment = True
+            self.raw_heatmap = experiment_data
+            self.mura_elements = 11
+            self.element_size_mm = 1.21
+            self.n_pixels = 256  # minpix EDU
+            self.pixel_size = 0.0055  # minpix EDU
 
         return
 
@@ -45,9 +58,13 @@ class Deconvolution:
             pos_trimmed = []
 
             for pp in pos:
-                if pp[0] <= (self.trim*self.pixel_size) or pp[0] >= (self.det_size_cm - (self.trim*self.pixel_size)):
+                if pp[0] <= (self.trim * self.pixel_size) or pp[0] >= (
+                    self.det_size_cm - (self.trim * self.pixel_size)
+                ):
                     continue
-                elif pp[1] <= (self.trim*self.pixel_size) or pp[1] >= (self.det_size_cm - (self.trim*self.pixel_size)):
+                elif pp[1] <= (self.trim * self.pixel_size) or pp[1] >= (
+                    self.det_size_cm - (self.trim * self.pixel_size)
+                ):
                     continue
                 else:
                     pos_trimmed.append(pp)
@@ -74,10 +91,14 @@ class Deconvolution:
         # get heatmap
         if self.trim:
             # if downsampling to number of MURA elements
-            #heatmap, xedges, yedges = np.histogram2d(xxes, yxes, bins=int( (self.n_pixels-(self.trim*2))  / self.downsample) )
-            heatmap, xedges, yedges = np.histogram2d(xxes, yxes, bins=int( (self.n_pixels-(self.trim*2))))
+            heatmap, xedges, yedges = np.histogram2d(
+                xxes, yxes, bins=self.resample_n_pixels
+            )
+            # heatmap, xedges, yedges = np.histogram2d(xxes, yxes, bins=int( (self.n_pixels-(self.trim*2))))
         else:
-            heatmap, xedges, yedges = np.histogram2d(xxes, yxes, bins=int(self.downsample)) # just for the pinhole case - remove extra
+            heatmap, xedges, yedges = np.histogram2d(
+                xxes, yxes, bins=int(self.downsample)
+            )  # just for the pinhole case - remove extra
 
         self.raw_heatmap = heatmap
 
@@ -135,7 +156,9 @@ class Deconvolution:
             decoder: 2d numpy array of decoding array, inverse of mask
         """
 
-        if (
+        if self.experiment:
+            check = 1
+        elif (
             self.mura_elements == 67
             or self.mura_elements == 31
             or self.mura_elements == 11
@@ -149,10 +172,10 @@ class Deconvolution:
             self.mask, self.mura_elements, holes_inv=False, check=check
         )
 
-        # comment this out if NOT downsampling!
-        decoder = np.repeat(decoder, self.n_pixels, axis=1).repeat(
-            self.n_pixels, axis=0
-        )
+        # resample the decoding array to the correct resolution
+        decoder = np.repeat(
+            decoder, self.resample_n_pixels // self.mura_elements, axis=1
+        ).repeat(self.resample_n_pixels // self.mura_elements, axis=0)
 
         self.decoder = decoder
 
@@ -295,15 +318,18 @@ class Deconvolution:
 
     def FWHM(self):
         from scipy.signal import peak_widths
+
         # just find the width of the center peak
-        results_half = peak_widths(self.signal, [5], rel_height=0.5) 
+        results_half = peak_widths(
+            self.signal, [self.resample_n_pixels // 2], rel_height=0.5
+        )
         return results_half[0][0]
 
     def deconvolve(
         self,
-        downsample: int = None,
-        trim: int = None,
-        plot_raw_heatmap: False = bool,
+        downsample: int = 1,
+        trim: int = 0,
+        plot_raw_heatmap: bool = False,
         save_raw_heatmap: str = "raw_hits_heatmap.png",
         plot_deconvolved_heatmap: bool = False,
         save_deconvolve_heatmap: str = "deconvolved_image.png",
@@ -313,12 +339,13 @@ class Deconvolution:
         check_resolved: bool = False,
         condition: str = "half_val",
         vmax: float = None,
+        experiment: bool = False,
     ) -> bool:
         """
         perform all the steps to deconvolve a raw image
 
         params:
-            downsample:               ??????
+            downsample:               factor to reduce pixel number by (i.e. downsample = 2 means 256 becomes 128)
             plot_raw_heatmap:         option to plot a heatmap of raw signal
             save_raw_heatmap:         name to save figure as for raw image
             plot_deconvolved_heatmap: option to plot a heatmap of deconvolved signal
@@ -336,12 +363,15 @@ class Deconvolution:
 
         self.downsample = downsample
         self.trim = trim
+        self.resample_n_pixels = int(
+            (self.n_pixels - (self.trim * 2)) / self.downsample
+        )
 
         # shift origin and remove unused pixels
-        self.shift_pos()
-
-        # get heatmap
-        self.get_raw()
+        # data from experiment does not need to be shifted
+        if not experiment:
+            self.shift_pos()
+            self.get_raw()
 
         if plot_raw_heatmap:
             self.plot_heatmap(self.raw_heatmap, save_name=save_raw_heatmap, vmax=vmax)
@@ -374,15 +404,15 @@ class Deconvolution:
         # get max signal (point sources usually)
         max_ind = np.where(self.deconvolved_image == np.amax(self.deconvolved_image))
         max_col = int(max_ind[0])
-        #if np.shape(max_col)[0] > 1:
+        # if np.shape(max_col)[0] > 1:
         #    max_col = max_col[0]
 
         # self.signal = np.fliplr(self.deconvolved_image)[:, int(max_col)]
         # self.signal = np.fliplr(self.deconvolved_image)[:, 536]
         # self.signal = np.sum(self.deconvolved_image, axis=1)
         # normalized signal
-        #self.signal = np.divide(self.deconvolved_image[np.shape(self.deconvolved_image)[0]//2,:], np.max(self.deconvolved_image[np.shape(self.deconvolved_image)[0]//2,:]))
-        self.signal = self.deconvolved_image[max_col,:]
+        # self.signal = np.divide(self.deconvolved_image[np.shape(self.deconvolved_image)[0]//2,:], np.max(self.deconvolved_image[np.shape(self.deconvolved_image)[0]//2,:]))
+        self.signal = self.deconvolved_image[max_col, :]
         self.max_signal_over_noise = np.amax(self.signal) - np.mean(
             self.signal[0 : len(self.signal) // 4]
         )
@@ -395,8 +425,7 @@ class Deconvolution:
             resolved = None
 
         return resolved, self.max_signal_over_noise
-   
-    
+
     """ # TODO! move these to a new script 
     def plot_flux_signal(self, ax, simulation_engine, fname):
         # calculate incident flux assuming isotropic
@@ -476,6 +505,7 @@ class Deconvolution:
         plt.savefig("../results/pinhole/%s.png" % (save_name), dpi=300)
         plt.close()
     """
+
 
 def shift(m, hs, vs):
     """
