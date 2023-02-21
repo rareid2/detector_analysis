@@ -1,33 +1,90 @@
+import os, re
 import pandas as pd
 import numpy as np
+from experiment_engine import ExperimentEngine
 from uncertainty import add_uncertainty
-from simulation_engine import SimulationEngine
 
 
 class Hits:
-    def __init__(self, simulation_engine: SimulationEngine, fname: str, experiment_geant4: bool = False) -> None:
+    def __init__(
+        self,
+        fname: str = None,
+        experiment: bool = False,
+        experiment_geant4: bool = False,
+        experiment_engine: ExperimentEngine = None,
+        file_count: int = 0,
+    ) -> None:
 
         # filename containing hits data
         self.fname = fname
 
-        # parse the hits
-        # geant experiment is set up in a new coordinate system
+        # ---------------------- parse the hits file -----------------------
+
+        # if physical experiment data its already digitized
+        # base_filename = os.path.basename(self.fname)
         if experiment:
+            # create file name from the distances and # of frames etc.
+            # m = re.match(r'(.*)-(.*)frames-(.*)s-(.*)cm-sd-(.*)cm-md', base_filename)
+            # experiment_setup = {
+            #    "isotope": m.group(1),
+            #    "frames": float(m.group(2)),
+            #    "exposure_s": float(m.group(3).replace("pt", ".")),
+            #    "source_detector_cm": float(m.group(4).replace("pt", ".")),
+            #    "mask_detector_cm": float(m.group(5).replace("pt", ".")),
+            # }
+            fname = "%s-%04dframes-%dpt%ds-%02dpt%02dcm-sd-%dpt%02dcm-md-%d.txt" % (
+                experiment_engine.isotope,
+                experiment_engine.frames,
+                experiment_engine.exposure_s,
+                round(100 * (experiment_engine.exposure_s % 1)),
+                experiment_engine.source_detector_cm,
+                round(100 * (experiment_engine.source_detector_cm % 1)),
+                experiment_engine.mask_detector_cm,
+                round(100 * (experiment_engine.mask_detector_cm % 1)),
+                file_count,
+            )
+            fname_full_path = os.path.join(experiment_engine.data_folder, fname)
+            f = open(fname_full_path, "r")
+
+            # get the array of data in
+            lines = [line.split() for line in f]
+            lines_array = np.array(
+                [
+                    [int(line_element.strip("/n")) for line_element in line]
+                    for line in lines
+                ]
+            ).astype(float)
+            lines_sum = np.sum(
+                np.array([np.sum(line_array) for line_array in lines_array])
+            )
+            f.close()
+
+            # add to dict
+            self.detector_hits = lines_array
+            # self.hits_dict = {"data": lines_array}
+            self.n_entries = len(np.where(lines_array > 0))
+            # add another dictionary with experiment data (distances etc.)
+            #self.experiment_setup = experiment_setup
+
+            self.fname = fname
+
+        # geant experiment is set up in a new coordinate system to import CAD files correctly
+        elif experiment_geant4:
             self.detector_hits = pd.read_csv(
-            self.fname,
-            names=["x", "y", "z", "energy"],
-            dtype={
-                "x": np.float64,
-                "y": np.float64,
-                "z": np.float64,
-                "energy": np.float64,
-            },
-            delimiter=",",
-            on_bad_lines="skip",
-            engine="c",
+                self.fname,
+                names=["x", "y", "z", "energy"],
+                dtype={
+                    "x": np.float64,
+                    "y": np.float64,
+                    "z": np.float64,
+                    "energy": np.float64,
+                },
+                delimiter=",",
+                on_bad_lines="skip",
+                engine="c",
             )
             self.n_entries = len(self.detector_hits["energy"])
-        
+
         # general geant4 simulations
         else:
             self.detector_hits = pd.read_csv(
@@ -53,7 +110,7 @@ class Hits:
         self.hits_dict = {}
 
         # get detector size if needed for uncertainty
-        self.det_size_cm = simulation_engine.det_size_cm
+        # self.det_size_cm = simulation_engine.det_size_cm
 
         return
 
@@ -130,6 +187,7 @@ class Hits:
         print("processed detector hits")
 
         return hits_dict
+
     # get hits for generalized setup in geant4
     def get_det_hits(self) -> dict:
         """
@@ -164,6 +222,7 @@ class Hits:
         print("processed detector hits")
 
         return hits_dict
+
     # get hits simulated in experiment set up in geant4
     def get_experiment_geant4_hits(self) -> dict:
         """
@@ -177,7 +236,7 @@ class Hits:
         posX = []
         posY = []
         energies = []
-        for count in range(len(self.detector_hits["energy"])-1):
+        for count in range(len(self.detector_hits["energy"]) - 1):
             xpos = self.detector_hits["x"][count]
             zpos = self.detector_hits["z"][count]
             energy_kev = self.detector_hits["energy"][count]
@@ -197,7 +256,9 @@ class Hits:
 
         return hits_dict
 
-    def update_pos_uncertainty(self, dist_type: str, dist_param: float) -> None:
+    def update_pos_uncertainty(
+        self, det_size_cm: float, dist_type: str, dist_param: float
+    ) -> None:
         """
         return a dictionary containing hits on both detectors
 
@@ -216,12 +277,10 @@ class Hits:
             pos2 = self.hits_dict["Position2"]
 
             unc_pos1 = [
-                add_uncertainty(pos, dist_type, dist_param, self.det_size_cm)
-                for pos in pos1
+                add_uncertainty(pos, dist_type, dist_param, det_size_cm) for pos in pos1
             ]
             unc_pos2 = [
-                add_uncertainty(pos, dist_type, dist_param, self.det_size_cm)
-                for pos in pos2
+                add_uncertainty(pos, dist_type, dist_param, det_size_cm) for pos in pos2
             ]
 
             # update entries
