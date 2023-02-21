@@ -10,7 +10,7 @@ and the detector to determine near and far field regimes for testing
 n_particles = 1000000
 energy_type = "Mono"
 energy_level = 500  # keV
-ranks = [11,31]
+ranks = [11]
 distances = [1,5]
 source_distances = np.linspace(-500,10,50)
 
@@ -22,7 +22,7 @@ ci=0
 # simulated two ranks and two distances
 for rank in ranks:
     for dist in distances:
-        file1 = open("../results/parameter_sweeps/timepix_sim/fwhm_%d_%d_%d_%s_%d.txt"
+        file1 = open("../results/parameter_sweeps/timepix_sim/fwhm-test/fwhm_%d_%d_%d_%s_%d.txt"
             % (rank, dist, n_particles, energy_type, energy_level), 'r')
         Lines = file1.readlines()
         Lines = [line.strip('\n') for line in Lines]
@@ -31,11 +31,15 @@ for rank in ranks:
         ci+=1
 
 # plotting clean up
-plt.gca().invert_xaxis()
+
 plt.legend()
 ax.grid()
 plt.xlabel('distance between detector and source [cm]')
 plt.ylabel('FWHM')
+plt.xlim([-100,0])
+plt.ylim([1,1.3])
+
+plt.gca().invert_xaxis()
 
 # save it
 plt.savefig('plotting/near-far-field-comp.png',dpi=500)
