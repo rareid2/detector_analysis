@@ -2,6 +2,7 @@ import numpy as np
 from numpy.typing import NDArray
 import matplotlib.pyplot as plt
 from scipy import interpolate
+from sklearn.neighbors import NearestNeighbors
 from typing import Tuple
 
 from hits import Hits
@@ -32,7 +33,6 @@ def find_clusters(hits: Hits) -> Tuple[list, list]:
             (1, 0),
             (1, 1),
             (0, -1),
-            (0, 0),
             (0, 1),
             (-1, -1),
             (-1, 0),
@@ -73,9 +73,10 @@ def find_clusters(hits: Hits) -> Tuple[list, list]:
         reg = find_regions(cur, points)
         region.append(reg.copy())
 
-    # identify clusters, sort by largest, heree area is the number of pixels
+    # identify clusters, sort by largest, area is the number of pixels
     clusters = {idx: area for idx, area in enumerate(map(len, region))}
     clusters = sorted(clusters.items(), key=lambda x: x[1], reverse=True)
+    # clusters is the index of the cluster in region and then the length of that region, sorted by length
 
     return region, clusters
 
@@ -95,7 +96,7 @@ def remove_clusters(
     params:
         hits : inherits from Hits class to parse data from experimetn output form Pixet Software
         region : list of indices corresponding to clusters
-        clusters : list of containing ... ? not totally sure
+        clusters : list of containing tuple (idx, area) where idx is the idx corresponding to region and area is the total # of pixels in cluster
         min_energy_keV : int of energies to filter below
         max_energy_keV : int of energies to filter equal to and above
         plot_clusters : bool to turn plotting on an doff for each step
@@ -104,36 +105,194 @@ def remove_clusters(
         background_clusters : array containing the clusters that were removed
     """
 
-    # create empty frame to be filled with coutns for every hit
+    # create empty frame to be filled with counts for every hit
     counts_frame = np.zeros_like(hits.detector_hits)
 
-    track_lengths = []
+    # empty lists to fill
+    track_areas = []
     track_total_energy = []
+    track_all_energies = []
+
+    # go through all clusters
     for idx, cluster in enumerate(clusters):
-        track_length = 0
+        track_area = 0
         energy_sum = 0
+        track_energies = []
         for x, y in region[cluster[0]]:
             counts_frame[x, y] = 1
 
             # total length in pixels and total energy depositied in keV
-            track_length += 1
+            track_area += 1
             energy_sum += hits.detector_hits[x, y]
 
-        track_lengths.append(track_length)
+            # energy along each track
+            track_energies.append(hits.detector_hits[x, y])
+
+        track_areas.append(track_area)
         track_total_energy.append(energy_sum)
+        track_all_energies.append(np.array(track_energies))
     # counts frame should be identical to original data but replaced with 1s for hits instead of energy deposited
 
     # convert to arrays
-    track_lengths = np.array(track_lengths)
+    track_areas = np.array(track_areas)
     track_total_energy = np.array(track_total_energy)
+    track_all_energies = np.array(track_all_energies, dtype='object')
 
-    # remove clusters based on total energy deposited
-    # TODO incorporate more criteria here
+    # remove clusters based on three criteria: cluster shape, cluster height (max in one pixel), stopping power
 
-    # TODO remove equals sign in below
+    # SHAPE IDENTIFICATION
+    track_shapes = track_areas.copy()
+
+    # DOTS are 1 pixel
+    dots = np.where(track_areas < 2)
+    # replace with 0
+    track_shapes[dots] = 0
+
+    # linearity of the track 
+    # https://www.tutorialspoint.com/program-to-count-number-of-points-that-lie-on-a-line-in-python
+    def linearity(point_crs):
+      res = 0
+      for i in range(len(point_crs)):
+         x1, y1 = point_crs[i][0], point_crs[i][1]
+         slopes = {}
+         same = 1
+         for j in range(i + 1, len(point_crs)):
+            x2, y2 = point_crs[j][0], point_crs[j][1]
+            if x2 == x1:
+               slopes[float("inf")] = slopes.get(float("inf"), 0) + 1
+            elif x1 == x2 and y1 == y2:
+               same += 1
+            else:
+               slope = (y2 - y1) / (x2 - x1)
+               slopes[slope] = slopes.get(slope, 0) + 1
+         if slopes:
+            res = max(res, same + max(slopes.values()))
+      return res / len(point_crs)
+
+    linearities = np.array([linearity(region[cluster[0]]) for cluster in clusters])
+
+    # SMALL BLOB has between 2 and 4 pixels and linearity is not 1
+    small_blobs = np.where((track_shapes > 1) & (track_shapes < 5) & (linearities < 1.0))
+    track_shapes[small_blobs] = 0
+
+    # STRAIGHT TRACK (short) has linearity of 1 and between 2 and 4 pixels
+    straight_short_tracks =  np.where((track_shapes > 1) & (track_shapes < 5) & (linearities == 1.0))
+    track_shapes[straight_short_tracks] = 0
+    
+    # HEAVY BLOBS have more than 4 pixels and inside pixels (pixels with 4 touching nearest neighbors)
+    heavy_blobs = []
+    for idx, track in enumerate(track_shapes): 
+        if track != 0:
+            # use nearest neighbors to distance of each pixel to every otheer pixel
+            nbrs = NearestNeighbors(n_neighbors=5, algorithm='auto').fit(region[clusters[idx][0]])
+            distances, indices = nbrs.kneighbors(region[clusters[idx][0]])
+            for distance in distances:
+                # find if there is a pixel in the group that is 1 pixel away from 4 other pixels (inside pixel)
+                if np.count_nonzero(distance == 1.0) > 3:
+                    heavy_blobs.append(idx)
+                    # if so, save the index of the group and get out
+                    break
+    
+    track_shapes[heavy_blobs] = 0
+
+    # STRAIGHT TRACK (long) has linearity above 90% and more than 4 pixels and is not a heavy blob
+    straight_long_tracks = np.where((track_shapes > 4) & (linearities > 0.9))
+    track_shapes[straight_long_tracks] = 0
+
+    # CURLY TRACK has linearity below 90% and more than 4 pixels and is not a heavy blob
+    curly_tracks = np.where((track_shapes > 4) & (linearities <= 0.9))
+    track_shapes[curly_tracks] = 0
+
+    # anything left over is bad and confusing
+    leftover_tracks = np.where(track_shapes > 0)
+    if len(leftover_tracks[0] > 0):
+        print("ERROR %d LEFTOVER TRACKS CHECK SHAPE CLASSIFICATION ALGORITHM" % len(leftover_tracks[0]))
+
+    # now check HEIGHT (max eneergy in group) and STOPPING POWER
+    signal_pixels = [] # these are both x rays / gammas / electrons
+    noisy_pixels = []
+    only_electrons = []
+    protons = []
+    ions = []
+
+    rho_silicon = 2.336 # g/cm^3
+
+    # cluster classifcation based on Gohl et al., 2019 -  SATRAM paper using Timepix 300um Si sensor
+    for idx, te in enumerate(track_all_energies):
+        # noisy pixels are those that are single dots but over 300keV deposited
+        if idx in dots[0]:
+            if float(te) > 300:
+                noisy_pixels.append(idx)
+            else: # not over 300 keV, either x ray or electron
+                signal_pixels.append(idx)
+        # small blobs and straight short tracks are either protons or xrays/electrons depending on energy deposited
+        elif idx in small_blobs[0] or idx in straight_short_tracks[0]:
+            if len(np.where(te > 300)[0]) > 0:
+                protons.append(idx)
+            else:
+                signal_pixels.append(idx)
+        # heavy blobs ions or protons based on stopping power
+        elif idx in heavy_blobs: # heavy blobs is formatted as a list
+            stopping_power = track_total_energy[idx] / (rho_silicon * track_areas[idx])
+            if stopping_power > 100 * 1e3:
+                ions.append(idx)
+            else:
+                protons.append(idx)
+        # long tracks are protons or electrons based on stopping power
+        elif idx in straight_long_tracks[0]:
+            stopping_power = track_total_energy[idx] / (rho_silicon * track_areas[idx])
+            if stopping_power > 10 * 1e3:
+                protons.append(idx)
+            else:
+                only_electrons.append(idx)
+        # curly tracks are electrons
+        elif idx in curly_tracks[0]:
+            only_electrons.append(idx)
+        else:
+            print('something went wrong')
+
+
+    # plotting! check if classification works:
+    for pro in only_electrons: 
+        cluster_check = clusters[pro]
+        x = [reg[0] for reg in region[cluster_check[0]]]
+        y = [reg[1] for reg in region[cluster_check[0]]]
+
+        plt.scatter(x,y,s=0.5,c='blue')
+    for pro in protons: 
+        cluster_check = clusters[pro]
+        x = [reg[0] for reg in region[cluster_check[0]]]
+        y = [reg[1] for reg in region[cluster_check[0]]]
+        plt.scatter(x,y,s=0.5,c='red')
+    signal_check = []
+    for pro in signal_pixels: 
+        cluster_check = clusters[pro]
+        x = [reg[0] for reg in region[cluster_check[0]]]
+        y = [reg[1] for reg in region[cluster_check[0]]]
+        if 19 <= track_total_energy[pro] <= 27:
+            signal_check.append(pro)
+            plt.scatter(x,y,s=0.5,c='orange')
+        else:
+            plt.scatter(x,y,s=0.5,c='green')
+    for pro in ions: 
+        cluster_check = clusters[pro]
+        x = [reg[0] for reg in region[cluster_check[0]]]
+        y = [reg[1] for reg in region[cluster_check[0]]]
+        plt.scatter(x,y,s=0.5,c='purple')
+    for pro in noisy_pixels: 
+        cluster_check = clusters[pro]
+        x = [reg[0] for reg in region[cluster_check[0]]]
+        y = [reg[1] for reg in region[cluster_check[0]]]
+        plt.scatter(x,y,s=0.5,c='yellow')
+    plt.xlim([0,256])
+    plt.ylim([0,256])
+    plt.savefig('test.png')
+    plt.clf()
+
+    # TODO remove equals sign in below?
     clusters_remove = []
-    total_energy_below = np.where(track_total_energy <= min_energy_keV)
-    total_energy_above = np.where(track_total_energy >= max_energy_keV)
+    total_energy_below = np.where(track_total_energy < min_energy_keV)
+    total_energy_above = np.where(track_total_energy > max_energy_keV)
     clusters_remove.extend(total_energy_below[0])
     clusters_remove.extend(total_energy_above[0])
 
@@ -180,7 +339,7 @@ def remove_clusters(
         plot_tracks = np.zeros_like(hits.detector_hits)
         plot_energies = np.zeros_like(hits.detector_hits)
         for idx, (cluster, track_length, track_energy) in enumerate(
-            zip(clusters, track_lengths, track_total_energy)
+            zip(clusters, track_areas, track_total_energy)
         ):
             for x, y in region[cluster[0]]:
                 plot_tracks[x, y] = track_length
