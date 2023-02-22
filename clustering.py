@@ -20,11 +20,12 @@ def find_clusters(hits: Hits) -> Tuple[list, list]:
         clusters : list of containing ... ? not totally sure
     """
 
-    # find locations of where the data is greater than 0
+    # find locations of where the data is greater than 0 - returns x and y array 
     wpoint = np.where(hits.detector_hits > 0)
+    # creates a set of x,y coords (unique points only) from the locations of every pixel with more than 0 deposited
     points = set((x, y) for x, y in zip(*wpoint))
 
-    # find nearest neighbors using set of 9 pixels around a pixel
+    # find nearest neighbors using set of 8 pixels around a pixel - 8 way searching routine
     def generate_neighbours(point):
         neighbours = [
             (1, -1),
@@ -38,6 +39,7 @@ def find_clusters(hits: Hits) -> Tuple[list, list]:
             (-1, 1),
         ]
         for neigh in neighbours:
+            # all this does is creates a tuple that represents the coordinates of the point and its neighbors
             yield tuple(map(sum, zip(point, neigh)))
 
     # find regions of pixels that are touching
@@ -46,12 +48,18 @@ def find_clusters(hits: Hits) -> Tuple[list, list]:
         seen = set()
 
         def dfs(point):
+            # add the point to set, else it has been seen do nothing
             if point not in seen:
                 seen.add(point)
+                # if the point exists in all points -- will be true for first pass in function, could be false for neighbors
                 if point in points:
+                    # save the location of it to add to the cluster
                     reg.append(point)
+                    # remove so it doesnt get double counted
                     points.remove(point)
+                    # return coordinates of the nearest neighbors
                     for n in generate_neighbours(point):
+                        # repeat this function for each neighbor
                         dfs(n)
 
         dfs(p)
@@ -60,11 +68,12 @@ def find_clusters(hits: Hits) -> Tuple[list, list]:
     region = []
 
     while points:
+        # iterates through the points that have energy > 0
         cur = next(iter(points))
         reg = find_regions(cur, points)
         region.append(reg.copy())
 
-    # identify clusters, sort by largest
+    # identify clusters, sort by largest, heree area is the number of pixels
     clusters = {idx: area for idx, area in enumerate(map(len, region))}
     clusters = sorted(clusters.items(), key=lambda x: x[1], reverse=True)
 
