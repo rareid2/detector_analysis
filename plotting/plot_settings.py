@@ -1,5 +1,6 @@
 import matplotlib.colors as mcolors
 import numpy as np
+import matplotlib.ticker
 
 
 def hex_to_rgb(value):
@@ -58,7 +59,17 @@ hex_list = [
     "#fdf1d2",
     "#f8eaad",
     "#faaaae",
-    "#ff57bb",
+    "#FFFFFF",
 ]
-# hex_list = ['#%s' % hl for hl in hex_list]
+#hex_list = ["#%s" % hl for hl in hex_list]
+#hex_list = ['#8ECAEE6','#219EBC','#023047']
+
+# prospectus colors
+#hex_list = ["#023047","#219EBC","#FFB703","#FB8500","#F15025"]
 cmap = get_continuous_cmap(hex_list)
+
+hex_colors = []
+for i in range(cmap.N):
+    rgba = cmap(i)
+    # rgb2hex accepts rgb or rgba
+    hex_colors.append(mcolors.rgb2hex(rgba))
