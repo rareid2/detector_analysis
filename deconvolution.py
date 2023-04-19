@@ -10,6 +10,7 @@ import sys
 
 sys.path.insert(1, "../coded_aperture_mask_designs")
 from util_fncs import makeMURA, make_mosaic_MURA, get_decoder_MURA
+from plotting.plot_settings import *
 
 
 class Deconvolution:
@@ -28,6 +29,7 @@ class Deconvolution:
             self.element_size_mm = simulation_engine.element_size_mm
             self.n_pixels = 256  # keep constant for timepix detector
             self.pixel_size = 0.0055  # cm # keep constant for timepix detector
+            self.experiment = True  # TODO fix this, temporary
         else:
             self.experiment = True
             self.raw_heatmap = experiment_data
@@ -123,8 +125,10 @@ class Deconvolution:
         """
 
         # plot transpose for visualization
-        plt.imshow(heatmap.T, origin="lower", cmap="RdBu_r", vmax=vmax)
+        plt.imshow(heatmap.T, origin="upper", cmap=cmap, vmax=125000)
         plt.colorbar(label=label)
+        plt.xlabel('pixel')
+        plt.ylabel('pixel')
         plt.savefig(save_name, dpi=300)
         plt.close()
 
@@ -167,7 +171,7 @@ class Deconvolution:
             check = 0
         else:
             check = 1
-
+        #check = 0
         decoder = get_decoder_MURA(
             self.mask, self.mura_elements, holes_inv=False, check=check
         )
@@ -286,28 +290,42 @@ class Deconvolution:
         """
 
         # plot the signal
-        plt.plot(self.signal, color="#34C0D2")
+        hex_list = [
+            "#0091ad",
+            "#3fcdda",
+            "#83f9f8",
+            "#d6f6eb",
+            "#fdf1d2",
+            "#f8eaad",
+            "#faaaae",
+            "#ff57bb",
+        ]
+        plt.plot(self.signal, color=hex_list[-1])
 
         if plot_conditions:
             # plot peak finding conditions if two peaks
             b, c, half_val, quarter_val, resolved = self.check_resolved(condition)
             x_ax = np.arange(0, len(self.signal))
-            plt.scatter(x_ax[b], self.signal[b], color="b")
-            plt.scatter(x_ax[c], self.signal[c], color="r")
+            plt.scatter(x_ax[b], self.signal[b], color=hex_list[1])
+            plt.scatter(x_ax[c], self.signal[c], color=hex_list[0])
             plt.hlines(
                 half_val,
                 xmin=0,
                 xmax=len(self.signal),
                 linestyles="--",
-                colors="#FF3A79",
+                colors=hex_list[1],
             )
-            plt.hlines(
-                quarter_val,
-                xmin=0,
-                xmax=len(self.signal),
-                linestyles="--",
-                colors="#FF3A79",
-            )
+            plt.xlabel('pixel')
+            plt.ylabel('signal')
+            #plt.ylim([1e6,5e6])
+
+            # plt.hlines(
+            #    quarter_val,
+            #    xmin=0,
+            #    xmax=len(self.signal),
+            #    linestyles="--",
+            #    colors="#FF3A79",
+            # )
         else:
             resolved = False
 
@@ -317,13 +335,17 @@ class Deconvolution:
         return resolved
 
     def FWHM(self):
-        from scipy.signal import peak_widths
+        from scipy.signal import peak_widths, find_peaks
+
+        peaks, _ = find_peaks(self.signal)
 
         # just find the width of the center peak
-        results_half = peak_widths(
-            self.signal, [self.resample_n_pixels // 2], rel_height=0.5
-        )
-        return results_half[0][0]
+        # results_half = peak_widths(
+        #    self.signal, [self.resample_n_pixels // 2], rel_height=0.5
+        # )
+        # print(results_half)
+        results_half = peak_widths(self.signal, peaks, rel_height=0.5)
+        return max(results_half[0])
 
     def deconvolve(
         self,
@@ -402,17 +424,38 @@ class Deconvolution:
         )
 
         # get max signal (point sources usually)
-        max_ind = np.where(self.deconvolved_image == np.amax(self.deconvolved_image))
-        max_col = int(max_ind[0])
+        # be consistent with treatment of the signal! -- it should be the AVERAGE SIGNAL AROUND SOURCE
+        # max_ind = np.where(self.deconvolved_image == np.amax(self.deconvolved_image))
+        max_ind = np.unravel_index(
+            self.deconvolved_image.argmax(), self.deconvolved_image.shape
+        )
+        try:
+            max_col = int(max_ind[0])
+            peak_loc = int(max_ind[0])
+        except:
+            print("issue with getting the peak of that")
+            max_col = 121
+            peak_loc = 10
         # if np.shape(max_col)[0] > 1:
         #    max_col = max_col[0]
 
         # self.signal = np.fliplr(self.deconvolved_image)[:, int(max_col)]
         # self.signal = np.fliplr(self.deconvolved_image)[:, 536]
-        # self.signal = np.sum(self.deconvolved_image, axis=1)
+        self.signal = np.sum(self.deconvolved_image, axis=1)
         # normalized signal
-        # self.signal = np.divide(self.deconvolved_image[np.shape(self.deconvolved_image)[0]//2,:], np.max(self.deconvolved_image[np.shape(self.deconvolved_image)[0]//2,:]))
-        self.signal = self.deconvolved_image[max_col, :]
+        #self.signal = np.divide(self.deconvolved_image[np.shape(self.deconvolved_image)[0]//2,:], np.max(self.deconvolved_image[np.shape(self.deconvolved_image)[0]//2,:]))
+
+        # self.signal = self.deconvolved_image[max_col, :]
+        # average of strip over the average background
+        # axis 1 = ROW
+        strip = int(25 / 2)
+
+        # if max_ind[1] < 40:
+        #    print(np.mean(self.deconvolved_image[60:,60:]))
+        #    self.signal = (np.sum(self.deconvolved_image[max_col-strip:max_col+strip,:],axis=0)/(2*strip)) - np.mean(self.deconvolved_image[60:,60:])
+        # else:
+        #    self.signal = (np.sum(self.deconvolved_image[max_col-strip:max_col+strip,:],axis=0)/(2*strip)) - np.mean(np.concatenate((self.deconvolved_image[0:30,0:30],self.deconvolved_image[90:120,90:120]),axis=1))
+
         self.max_signal_over_noise = np.amax(self.signal) - np.mean(
             self.signal[0 : len(self.signal) // 4]
         )
@@ -424,7 +467,7 @@ class Deconvolution:
         else:
             resolved = None
 
-        return resolved, self.max_signal_over_noise
+        return resolved, self.deconvolved_image, self.raw_heatmap, self.FWHM()
 
     """ # TODO! move these to a new script 
     def plot_flux_signal(self, ax, simulation_engine, fname):

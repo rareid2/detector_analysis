@@ -36,7 +36,7 @@ class Hits:
                 experiment_engine.isotope,
                 experiment_engine.frames,
                 experiment_engine.exposure_s,
-                round(100 * (experiment_engine.exposure_s % 1)),
+                round(10 * (experiment_engine.exposure_s % 1)),
                 experiment_engine.source_detector_cm,
                 round(100 * (experiment_engine.source_detector_cm % 1)),
                 experiment_engine.mask_detector_cm,

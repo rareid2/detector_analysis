@@ -45,17 +45,18 @@ mask_config_list = [
     )
 ]
 multipliers_fwhm = [22, 8]
+
 # thickness of mask
 thicknesses = np.logspace(2, 3.5, 5)  # im um, mask thickness  # im um, mask thickness
 thickness = thicknesses[2]
+
 # distance between mask and detector
 distances = np.flip(np.linspace(0.1 * 2 * det_size_cm, 10 * 2 * det_size_cm, 50))
 # just grab the last 2
-distances = [5, distances[-1]]
-distances =[5.05]
-source_distances = np.linspace(-500,10,50)
-source_distances = [-26]
-for mi, mask_config in enumerate([mask_config_list[1], mask_config_list[3]]):
+distances = [distances[0], distances[-1]]
+source_distances = np.linspace(-1000,10,100)
+
+for mi, mask_config in enumerate([mask_config_list[3]]):
     for start_distance in distances:
         sim_count = 0
 
@@ -76,7 +77,8 @@ for mi, mask_config in enumerate([mask_config_list[1], mask_config_list[3]]):
         )
 
         for source_distance in source_distances:
-            set_source = source_distance + start_distance
+            # get distance including distance between mask and aperture
+            set_source = -1*(np.abs(source_distance) + start_distance)
 
             simulation_engine.set_macro(
                 n_particles=1000000,
@@ -90,10 +92,10 @@ for mi, mask_config in enumerate([mask_config_list[1], mask_config_list[3]]):
                 % (thickness, mask_config[1], distance, set_source)
             )
 
-            if sim_count == 0:
-                simulation_engine.run_simulation(fname, build=True)
-            else:
-                simulation_engine.run_simulation(fname, build=False)
+            #if sim_count == 0:
+            #    simulation_engine.run_simulation(fname, build=True)
+            #else:
+            #    simulation_engine.run_simulation(fname, build=False)
 
             myhits = Hits(fname=fname, experiment=False)
             myhits.get_det_hits()
@@ -104,7 +106,7 @@ for mi, mask_config in enumerate([mask_config_list[1], mask_config_list[3]]):
                 save_raw_heatmap="../simulation_results/parameter_sweeps/prospectus_plots/fwhm/%d_%d_%.2f_%.2f_raw.png"
                 % (thickness, mask_config[1], distance, set_source),
                 plot_raw_heatmap=True,
-                downsample=22,
+                downsample=8,
                 trim=mask_config[3],
                 save_deconvolve_heatmap="../simulation_results/parameter_sweeps/prospectus_plots/fwhm/%d_%d_%.2f_%.2f_dc.png"
                 % (thickness, mask_config[1], distance, set_source),
@@ -122,6 +124,6 @@ for mi, mask_config in enumerate([mask_config_list[1], mask_config_list[3]]):
                 "a",
             )  # append mode
 
-            file1.write("%.2f %.4f \n" % (set_source - start_distance, fwhm))
+            file1.write("%.2f %.4f \n" % (np.abs(set_source) - start_distance, fwhm))
             file1.close()
             sim_count += 1

@@ -209,7 +209,7 @@ def remove_clusters(
         print("ERROR %d LEFTOVER TRACKS CHECK SHAPE CLASSIFICATION ALGORITHM" % len(leftover_tracks[0]))
 
     # now check HEIGHT (max eneergy in group) and STOPPING POWER
-    signal_pixels = [] # these are both x rays / gammas / electrons
+    potential_signal_pixels = [] # these are both x rays / gammas / electrons
     noisy_pixels = []
     only_electrons = []
     protons = []
@@ -224,13 +224,13 @@ def remove_clusters(
             if float(te) > 300:
                 noisy_pixels.append(idx)
             else: # not over 300 keV, either x ray or electron
-                signal_pixels.append(idx)
+                potential_signal_pixels.append(idx)
         # small blobs and straight short tracks are either protons or xrays/electrons depending on energy deposited
         elif idx in small_blobs[0] or idx in straight_short_tracks[0]:
             if len(np.where(te > 300)[0]) > 0:
                 protons.append(idx)
             else:
-                signal_pixels.append(idx)
+                potential_signal_pixels.append(idx)
         # heavy blobs ions or protons based on stopping power
         elif idx in heavy_blobs: # heavy blobs is formatted as a list
             stopping_power = track_total_energy[idx] / (rho_silicon * track_areas[idx])
@@ -251,8 +251,14 @@ def remove_clusters(
         else:
             print('something went wrong')
 
+    # final signal filtering - check energy deposited
+    signal_pixels = []
+    for idx in potential_signal_pixels:
+        if min_energy_keV <= track_total_energy[idx] <= max_energy_keV:
+            signal_pixels.append(idx)
 
     # plotting! check if classification works:
+    """
     for pro in only_electrons: 
         cluster_check = clusters[pro]
         x = [reg[0] for reg in region[cluster_check[0]]]
@@ -286,13 +292,14 @@ def remove_clusters(
         plt.scatter(x,y,s=0.5,c='yellow')
     plt.xlim([0,256])
     plt.ylim([0,256])
-    plt.savefig('test.png')
+    #plt.savefig('test.png')
     plt.clf()
+    """
 
     # TODO remove equals sign in below?
     clusters_remove = []
-    total_energy_below = np.where(track_total_energy < min_energy_keV)
-    total_energy_above = np.where(track_total_energy > max_energy_keV)
+    total_energy_below = np.where(track_total_energy <= min_energy_keV)
+    total_energy_above = np.where(track_total_energy >= max_energy_keV)
     clusters_remove.extend(total_energy_below[0])
     clusters_remove.extend(total_energy_above[0])
 
@@ -381,7 +388,10 @@ def remove_clusters(
         plt.show()
         plt.clf()
 
-    return cleaned_data, background_clusters
+    background_tracks_total_energy = track_total_energy.copy()
+    signal_tracks_total_energy = track_total_energy[signal_pixels]
+
+    return cleaned_data, background_clusters, background_tracks_total_energy, signal_tracks_total_energy
 
 
 # for testing

@@ -1,4 +1,5 @@
 import numpy as np
+import sys
 
 from experiment_engine import ExperimentEngine
 from hits import Hits
@@ -6,28 +7,39 @@ from deconvolution import Deconvolution
 
 from clustering import find_clusters, remove_clusters
 from resample import resample_data
-from plotting.plot_experiment_data import plot_four_subplots
+from plotting.plot_experiment_data import plot_four_subplots, plot_background_subplots, plot_alignment
 
 from experiment_constants import *
 
-two_sources = True
+two_sources = False
 # -------------------- set experiment set up ----------------------
-isotope = "Cd109"
-frames = 250
+isotope = "background"
+frames = 360
 exposure_s = 1.0
-source_detector_cm = 44.66
-mask_detector_cm = 2
+source_detector_cm = 0
+mask_detector_cm = 0
 offset_deg1 = 0
-n_files = 25
+n_files = 20
+
+max_energy_keV_spectra = 80
+bin_interval = int(max_energy_keV_spectra // 2)
+bins = np.linspace(
+    0, max_energy_keV_spectra + int(max_energy_keV_spectra / bin_interval), bin_interval
+)
 
 min_energy_keV = 19
 max_energy_keV = 27
 
-if offset_deg1 == 0:
+if isotope == "background":
+    data_folder = "background-testing/box/"
+elif offset_deg1 == 0:
     data_folder = "fwhm/%dcm/" % round(mask_detector_cm)
+    #data_folder = "long-exposures/%dpt%ddeg" % (
+    #    offset_deg1,
+    #    10 * (offset_deg1 % 1),
+    #)
 else:
-    data_folder = "%dcm/%dpt%ddeg" % (
-        mask_detector_cm,
+    data_folder = "5cm/%dpt%ddeg" % (
         offset_deg1,
         10 * (offset_deg1 % 1),
     )
@@ -37,6 +49,8 @@ print("reading data from ", data_folder)
 raw_data = np.zeros((n_pixels, n_pixels))
 cleaned_data_all = np.zeros_like(raw_data)
 background_data = np.zeros_like(raw_data)
+background_spectra = np.zeros(len(bins) - 1)
+signal_spectra = np.zeros(len(bins) - 1)
 
 my_experiment_engine = ExperimentEngine(
     isotope,
@@ -47,33 +61,75 @@ my_experiment_engine = ExperimentEngine(
     data_folder,
     n_files,
 )
+cc = 0
 
 # ---------------------- get data -------------------------------
 for i in range(n_files):
     my_hits = Hits(
         experiment=True, experiment_engine=my_experiment_engine, file_count=i
     )
-    raw_data += my_hits.detector_hits
+    #raw_data += my_hits.detector_hits
+    hits = np.where(my_hits.detector_hits > 0)
+    hits_array = np.zeros_like(my_hits.detector_hits)
+    hits_array[hits] = 1
+    raw_data += hits_array
 
     region, clusters = find_clusters(my_hits)
-    cleaned_data, background_clusters = remove_clusters(
-        my_hits, region, clusters, min_energy_keV, max_energy_keV
-    )
+    (
+        cleaned_data,
+        background_clusters,
+        background_tracks,
+        signal_tracks,
+    ) = remove_clusters(my_hits, region, clusters, min_energy_keV, max_energy_keV)
 
-    cleaned_data_all += cleaned_data
-    background_data += background_clusters
+    #cleaned_data_all += cleaned_data
+    hits = np.where(cleaned_data > 0)
+    hits_array = np.zeros_like(cleaned_data_all)
+    hits_array[hits] = 1
+    cleaned_data_all += hits_array
+
+    #background_data += background_clusters
+    hits = np.where(background_clusters > 0)
+    hits_array = np.zeros_like(background_data)
+    hits_array[hits] = 1
+    background_data += hits_array
+
+    # get spectra from data
+
+    # shove the larger values into the overflow bin
+    # (hack to make an overflow bin - https://stackoverflow.com/questions/26218704/matplotlib-histogram-with-collection-bin-for-high-values)
+    background_tracks = [
+        max_energy_keV_spectra + int(max_energy_keV_spectra / (2 * bin_interval))
+        if i > (max_energy_keV_spectra)
+        else i
+        for i in background_tracks
+    ]
+    background_hist_counts, binEdges = np.histogram(background_tracks, bins=bins)
+    bincenters = 0.5 * (binEdges[1:] + binEdges[:-1])
+    background_spectra += background_hist_counts
+
+    signal_tracks = [
+        max_energy_keV_spectra + int(max_energy_keV_spectra / (2 * bin_interval))
+        if i > (max_energy_keV_spectra)
+        else i
+        for i in signal_tracks
+    ]
+    signal_hist_counts, binEdges = np.histogram(signal_tracks, bins=bins)
+    bincenters = 0.5 * (binEdges[1:] + binEdges[:-1])
+    signal_spectra += signal_hist_counts
+
+    cc += len(np.argwhere(cleaned_data > 0))
 
     print(
         "READ AND CLEANED FILE %d" % i,
         "WITH ",
-        len(np.argwhere(cleaned_data > 0)),
+        cc,
         "COUNTS",
     )
 
 if two_sources:
     # -------------------- set experiment set up ----------------------
-    offset_deg2s = [2.5, 5, 7.5, 10, 12.5, 15, 17.5]
-    # offset_deg2s = [1]
+    offset_deg2s = [2]
 
     for offset_deg2 in offset_deg2s:
 
@@ -85,7 +141,7 @@ if two_sources:
                 offset_deg2,
                 10 * (offset_deg2 % 1),
             )
-        # data_folder = "long-exposures/2deg"
+            data_folder = "long-exposures/2pt0deg"
         my_experiment_engine = ExperimentEngine(
             isotope,
             frames,
@@ -101,64 +157,152 @@ if two_sources:
             my_hits = Hits(
                 experiment=True, experiment_engine=my_experiment_engine, file_count=i
             )
-            raw_data += my_hits.detector_hits
+            #raw_data += my_hits.detector_hits
+            hits = np.where(my_hits.detector_hits > 0)
+            hits_array = np.zeros_like(my_hits.detector_hits)
+            hits_array[hits] = 1
+            raw_data += hits_array
 
             region, clusters = find_clusters(my_hits)
-            cleaned_data, background_clusters = remove_clusters(
-                my_hits, region, clusters, min_energy_keV, max_energy_keV
-            )
+            (
+                cleaned_data,
+                background_clusters,
+                background_tracks,
+                signal_tracks,
+            ) = remove_clusters(my_hits, region, clusters, min_energy_keV, max_energy_keV)
 
-            cleaned_data_all += cleaned_data
-            background_data += background_clusters
+            #cleaned_data_all += cleaned_data
+            hits = np.where(cleaned_data > 0)
+            hits_array = np.zeros_like(cleaned_data_all)
+            hits_array[hits] = 1
+            cleaned_data_all += hits_array
+
+            #background_data += background_clusters
+            hits = np.where(background_clusters > 0)
+            hits_array = np.zeros_like(background_data)
+            hits_array[hits] = 1
+            background_data += hits_array
+
+            # get spectra from data
+
+            # shove the larger values into the overflow bin
+            # (hack to make an overflow bin - https://stackoverflow.com/questions/26218704/matplotlib-histogram-with-collection-bin-for-high-values)
+            background_tracks = [
+                max_energy_keV_spectra + int(max_energy_keV_spectra / (2 * bin_interval))
+                if i > (max_energy_keV_spectra)
+                else i
+                for i in background_tracks
+            ]
+            background_hist_counts, binEdges = np.histogram(background_tracks, bins=bins)
+            bincenters = 0.5 * (binEdges[1:] + binEdges[:-1])
+            background_spectra += background_hist_counts
+
+            signal_tracks = [
+                max_energy_keV_spectra + int(max_energy_keV_spectra / (2 * bin_interval))
+                if i > (max_energy_keV_spectra)
+                else i
+                for i in signal_tracks
+            ]
+            signal_hist_counts, binEdges = np.histogram(signal_tracks, bins=bins)
+            bincenters = 0.5 * (binEdges[1:] + binEdges[:-1])
+            signal_spectra += signal_hist_counts
+
+            cc += len(np.argwhere(cleaned_data > 0))
 
             print(
                 "READ AND CLEANED FILE %d" % i,
                 "WITH ",
-                len(np.argwhere(cleaned_data > 0)),
+                cc,
                 "COUNTS",
             )
 
 # ---------------------- analyze -------------------------------
-trim = 7
-resample_n_pixels = 121
+if isotope != "background":
+    trim = 7
+    resample_n_pixels = 121
 
-resampled_data = resample_data(
-    n_pixels=n_pixels,
-    trim=trim,
-    resample_n_pixels=resample_n_pixels,
-    data=cleaned_data_all,
-)
+    resampled_data = resample_data(
+        n_pixels=n_pixels,
+        trim=trim,
+        resample_n_pixels=resample_n_pixels,
+        data=cleaned_data_all,
+    )
 
-# set up deconvolution
-deconvolver = Deconvolution(experiment_data=resampled_data)
-deconvolver.deconvolve(
-    experiment=True,
-    downsample=int((n_pixels - 2 * trim) / resample_n_pixels),
-    trim=trim,
-)
+    # set up deconvolution
+    deconvolver = Deconvolution(experiment_data=resampled_data)
+    _,_,_,fwhm = deconvolver.deconvolve(
+        experiment=True,
+        downsample=int((n_pixels - 2 * trim) / resample_n_pixels),
+        trim=trim,
+    )
+    print(fwhm)
+    import matplotlib.pyplot as plt
+    from plotting.plot_settings import *
+    """
+    plt.clf()
+    colors = ["#023047","#219EBC","#FFB703","#FB8500","#F15025"]
+    plt.plot(deconvolver.signal, color=colors[3])
+    plt.xlabel('pixel #')
+    plt.ylabel('signal')
+    plot_fname = my_hits.fname[:-6] + "%dpt%ddeg-%dpt%ddeg-offset-signal" % (
+        offset_deg1,
+        10 * (offset_deg1 % 1),
+        offset_deg2,
+        10 * (offset_deg2 % 1),
+    )
+    plt.ylim([-200,1400])
+    plt.hlines(np.max(deconvolver.signal),0,121,linestyles='--',color=colors[3])
+    plt.hlines(np.max(deconvolver.signal)/2,0,121,linestyles='--',color=colors[3])
+    plt.savefig("../experiment_results/%s" % plot_fname,dpi=300,transparent=True)
+    """
+    
+np.savetxt('background-timepix-data.txt', background_spectra)
+np.savetxt('background-timepix-bins.txt', bincenters)
 
 # ---------------------- finally plot it!----------------------
-if two_sources:
+if isotope == "background":
+    plot_fname = my_hits.fname[:-6] + "background"
+    vmaxes = [1, None]
+    plot_background_subplots(
+    raw_data=raw_data,
+    cleaned_data=cleaned_data_all,
+    background_hist=background_spectra,
+    signal_hist=signal_spectra,
+    bincenters=bincenters,
+    vmaxes=vmaxes,
+    save_name=plot_fname,
+    time=n_files * exposure_s * frames,
+    )
+
+elif two_sources:
     plot_fname = my_hits.fname[:-6] + "%dpt%ddeg-%dpt%ddeg-offset" % (
         offset_deg1,
         10 * (offset_deg1 % 1),
         offset_deg2,
         10 * (offset_deg2 % 1),
     )
-    plot_fname = my_hits.fname[:-6] + "all-offset"
-    vmaxes = [60, 7e4]
+    #plot_fname = my_hits.fname[:-6] + "all-offset"
+    vmaxes = [3, 2e3]
+    plot_four_subplots(
+        raw_data=raw_data,
+        cleaned_data=cleaned_data_all,
+        resampled_data=resampled_data,
+        deconvolved_image=deconvolver.deconvolved_image,
+        save_name=plot_fname,
+        vmaxes=vmaxes,
+    )
 else:
     plot_fname = my_hits.fname[:-6] + "%dpt%ddeg-offset" % (
         offset_deg1,
         10 * (offset_deg1 % 1),
     )
-    vmaxes = [30, 3e4]
-
-plot_four_subplots(
-    raw_data=raw_data,
-    cleaned_data=cleaned_data_all,
-    resampled_data=resampled_data,
-    deconvolved_image=deconvolver.deconvolved_image,
-    save_name=plot_fname,
-    vmaxes=vmaxes,
-)
+    #plot_fname = my_hits.fname[:-6] + '-alignment'
+    vmaxes = [3, 2e3]
+    plot_four_subplots(
+        raw_data=raw_data,
+        cleaned_data=cleaned_data_all,
+        resampled_data=resampled_data,
+        deconvolved_image=deconvolver.deconvolved_image,
+        save_name=plot_fname,
+        vmaxes=vmaxes,
+    )

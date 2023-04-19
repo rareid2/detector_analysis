@@ -23,7 +23,7 @@ class SimulationEngine:
 
         # set some params from geant
         self.env_sizeXY = 2600  # cm
-        self.env_sizeZ = 1111  # cm
+        self.env_sizeZ = 2600  # cm
         self.world_sizeXY = 1.1 * self.env_sizeXY
         self.world_sizeZ = 1.1 * self.env_sizeZ
         self.world_offset = self.env_sizeZ * 0.45
