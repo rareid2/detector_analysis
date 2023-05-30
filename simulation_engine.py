@@ -9,7 +9,6 @@ from macros import (
 import os
 
 EPAD_dir = "/home/rileyannereid/workspace/geant4/EPAD_geant4"
-GEANT_dir = "/home/rileyannereid/workspace/geant4/geant4.10.07.p02-install/bin/"
 
 
 class SimulationEngine:
@@ -176,7 +175,7 @@ class SimulationEngine:
         sphere: bool = False,
         radius_cm: float = 25,
         progress_mod: int = 1000,
-        fname: str = "test",
+        fname_tag: str = "test",
     ) -> None:
         """
         create macro file based on simulation type -- see macros.py for function defs
@@ -187,7 +186,6 @@ class SimulationEngine:
         # assign for later use
         self.n_particles = n_particles
         self.radius_cm = radius_cm
-        self.fname = fname
 
         if self.write_files:
             if self.construct == "TD" and self.source == "PS":
@@ -213,7 +211,7 @@ class SimulationEngine:
                     energies_keV=energy_keV,
                     detector_placement=self.detector_placement,
                     progress_mod=progress_mod,
-                    fname=self.fname,
+                    fname_tag=fname_tag,
                 )
             else:
                 macro_file = write_PAD_macro(
@@ -229,7 +227,7 @@ class SimulationEngine:
 
         return
 
-    def rename_hits(self) -> None:
+    def rename_hits(self, fname: str = "../simulation-data/hits.csv") -> None:
         """
         rename the output hits file
 
@@ -238,7 +236,7 @@ class SimulationEngine:
         returns:
         """
 
-        os.rename("../simulation-data/hits.csv", self.fname)
+        os.rename("../simulation-data/hits.csv", fname)
 
         return
 
@@ -268,6 +266,7 @@ class SimulationEngine:
 
     def run_simulation(
         self,
+        fname: str = "../simulation-data/hits.csv",
         build: bool = True,
         debug: bool = False,
     ) -> None:  # need to add optoin to not rebuild each time (?)
@@ -293,7 +292,7 @@ class SimulationEngine:
         os.system(cmd)
         os.chdir(cwd)
 
-        self.rename_hits()
+        self.rename_hits(fname)
 
         print("simulation complete")
 
