@@ -14,7 +14,10 @@ GEANT_dir = "/home/rileyannereid/workspace/geant4/geant4.10.07.p02-install/bin/"
 
 class SimulationEngine:
     def __init__(
-        self, construct: str = "CA", source: str = "PS", write_files: bool = True
+        self,
+        construct: str = "CA",
+        source: str = "PS",
+        write_files: bool = True,
     ) -> None:
         self.construct = construct
         self.source = source
@@ -173,6 +176,7 @@ class SimulationEngine:
         sphere: bool = False,
         radius_cm: float = 25,
         progress_mod: int = 1000,
+        fname: str = "test",
     ) -> None:
         """
         create macro file based on simulation type -- see macros.py for function defs
@@ -183,6 +187,7 @@ class SimulationEngine:
         # assign for later use
         self.n_particles = n_particles
         self.radius_cm = radius_cm
+        self.fname = fname
 
         if self.write_files:
             if self.construct == "TD" and self.source == "PS":
@@ -208,6 +213,7 @@ class SimulationEngine:
                     energies_keV=energy_keV,
                     detector_placement=self.detector_placement,
                     progress_mod=progress_mod,
+                    fname=self.fname,
                 )
             else:
                 macro_file = write_PAD_macro(
@@ -223,7 +229,7 @@ class SimulationEngine:
 
         return
 
-    def rename_hits(self, fname: str) -> None:
+    def rename_hits(self) -> None:
         """
         rename the output hits file
 
@@ -232,7 +238,7 @@ class SimulationEngine:
         returns:
         """
 
-        os.rename("../simulation-data/hits.csv", fname)
+        os.rename("../simulation-data/hits.csv", self.fname)
 
         return
 
@@ -262,7 +268,6 @@ class SimulationEngine:
 
     def run_simulation(
         self,
-        fname: str = "../data/hits.csv",
         build: bool = True,
         debug: bool = False,
     ) -> None:  # need to add optoin to not rebuild each time (?)
@@ -288,7 +293,7 @@ class SimulationEngine:
         os.system(cmd)
         os.chdir(cwd)
 
-        self.rename_hits(fname)
+        self.rename_hits()
 
         print("simulation complete")
 
