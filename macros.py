@@ -54,6 +54,7 @@ def write_pt_macro(
     detector_placement: float,
     macro_directory: str = "/home/rileyannereid/workspace/geant4/EPAD_geant4/macros",
     progress_mod: int = 1000,
+    fname_tag: str = "test",
 ) -> None:
     """
     create macro file for a point source (or multiple point sources)
@@ -92,7 +93,6 @@ def write_pt_macro(
             normal = (detector_loc - src) / norm_d
             # if rotation = 1 calculate direction required to point source at center of detector
             if rot != 0:
-
                 y_ax = np.array([0, 1, 0])
 
                 # found on a reddit forum to get geant to cooperate
@@ -121,14 +121,31 @@ def write_pt_macro(
 
             f.write("/gps/ang/type iso \n")
             f.write("/gps/ang/mintheta 0 deg \n")
-            
+
             # find max theta
-            maxtheta = np.rad2deg(2 * np.arctan((1.408 / 2)/ norm_d))
+            maxtheta = np.rad2deg(2 * np.arctan((1.408 / 2) / norm_d))
             f.write("/gps/ang/maxtheta %f deg \n" % maxtheta)
-            
+
             f.write("/gps/ang/minphi 0 deg \n")
             f.write("/gps/ang/maxphi 360 deg \n")
             f.write("/gps/energy " + str(ene) + " keV \n")
+            f.write("/analysis/setFileName %s \n" % fname_tag)
+            f.write("/analysis/h1/set 1 100 100 1000 keV \n")
+            f.write(
+                "/analysis/h2/set 1 100 -5 5 cm none linear 100 -5 5 cm none linear \n"
+            )
+            f.write(
+                "/analysis/h2/set 2 100 -5 5 cm none linear 100 -5 5 cm none linear \n"
+            )
+            f.write(
+                "/analysis/h2/set 3 100 -5 5 cm none linear 100 -5 5 cm none linear \n"
+            )
+            f.write(
+                "/analysis/h2/set 4 120 0 360 deg none linear 100 -1 1 none none linear \n"
+            )
+            f.write(
+                "/analysis/h2/set 5 120 0 360 deg none linear  90 0 180 deg none linear \n"
+            )
             f.write("/run/printProgress %d \n" % int(progress_mod))
             f.write("/run/beamOn " + str(int(n_particles)) + "\n")
 
@@ -217,6 +234,7 @@ def write_sphere_macro(
     macro_path = os.path.join(macro_directory, mf)
 
     with open(macro_path, "w") as f:
+        f.write("/run/numberOfThreads 40 \n")
         f.write("/run/initialize \n")
         f.write("/control/verbose 0 \n")
         f.write("/run/verbose 0 \n")
@@ -229,11 +247,14 @@ def write_sphere_macro(
         f.write("/gps/pos/radius %.2f cm \n" % radius_cm)
 
         # center chosen to align with pinhole (maybe change this?)
-        f.write("/gps/pos/centre 0 0 498.5 cm \n")
+        f.write("/gps/pos/centre 0 0 497.91 cm \n")
+
+        # write the confinement to the volume
+        f.write("/gps/pos/confine fovCapPV \n")
 
         f.write("/gps/ang/type cos \n")
-        f.write("/gps/ang/mintheta 0 deg \n")
-        f.write("/gps/ang/maxtheta 90 deg \n")
+        # f.write("/gps/ang/mintheta 0 deg \n")
+        # f.write("/gps/ang/maxtheta 90 deg \n")
 
         f.write("/gps/ene/type %s \n" % ene_type)
         if ene_type == "Mono":
