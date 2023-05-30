@@ -14,20 +14,19 @@ GEANT_dir = "/home/rileyannereid/workspace/geant4/geant4.10.07.p02-install/bin/"
 
 class SimulationEngine:
     def __init__(
-        self, construct: str = "CA", source: str = "DS", write_files: bool = True
+        self, construct: str = "CA", source: str = "PS", write_files: bool = True
     ) -> None:
-
         self.construct = construct
         self.source = source
         self.write_files = write_files
 
         # set some params from geant
         self.env_sizeXY = 2600  # cm
-        self.env_sizeZ = 2600  # cm
+        self.env_sizeZ = 1111  # cm
         self.world_sizeXY = 1.1 * self.env_sizeXY
         self.world_sizeZ = 1.1 * self.env_sizeZ
         self.world_offset = self.env_sizeZ * 0.45
-        self.detector_placement = 0# self.world_offset  # im cm
+        self.detector_placement = 0  # self.world_offset  # im cm
 
     def det_config(
         self,
@@ -199,7 +198,7 @@ class SimulationEngine:
                     ene_type=energy_keV[0],
                     ene_min_keV=energy_keV[1],
                     ene_max_keV=energy_keV[2],
-                    progress_mod=progress_mod
+                    progress_mod=progress_mod,
                 )
             elif self.construct == "CA" and self.source == "PS" and sphere == False:
                 macro_file = write_pt_macro(
@@ -233,7 +232,7 @@ class SimulationEngine:
         returns:
         """
 
-        os.rename("../simulation_data/hits.csv", fname)
+        os.rename("../simulation-data/hits.csv", fname)
 
         return
 
@@ -262,7 +261,10 @@ class SimulationEngine:
         return
 
     def run_simulation(
-        self, fname: str = "../data/hits.csv", build: bool = True
+        self,
+        fname: str = "../data/hits.csv",
+        build: bool = True,
+        debug: bool = False,
     ) -> None:  # need to add optoin to not rebuild each time (?)
         """
         run macro, rename data file after
@@ -277,7 +279,12 @@ class SimulationEngine:
 
         cwd = os.getcwd()
         os.chdir(EPAD_dir)
-        cmd = "build/main %s/macros/%s" % (EPAD_dir, self.macro_file)
+
+        if debug:
+            cmd = "gdb build/main"
+        else:
+            cmd = "build/main %s/macros/%s" % (EPAD_dir, self.macro_file)
+
         os.system(cmd)
         os.chdir(cwd)
 
