@@ -202,6 +202,7 @@ class SimulationEngine:
                     ene_min_keV=energy_keV[1],
                     ene_max_keV=energy_keV[2],
                     progress_mod=progress_mod,
+                    fname_tag=fname_tag,
                 )
             elif self.construct == "CA" and self.source == "PS" and sphere == False:
                 macro_file = write_pt_macro(
