@@ -258,7 +258,7 @@ class SimulationEngine:
         os.chdir("build")
         os.system("make clean")
         os.system(
-            "cmake -DCONSTRUCT=%s -DPARTICLE_SOURCE=%s .. & make"
+            "cmake -DCONSTRUCT=%s -DPARTICLE_SOURCE=%s .. & make -j4"
             % (self.construct, self.source)
         )
         os.chdir(cwd)
