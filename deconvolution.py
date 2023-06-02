@@ -20,7 +20,6 @@ class Deconvolution:
         simulation_engine: SimulationEngine = None,
         experiment_data: NDArray[np.uint16] = None,
     ) -> None:
-
         if simulation_engine is not None:
             self.hits_dict = hits.hits_dict
             self.det_size_cm = simulation_engine.det_size_cm
@@ -29,7 +28,7 @@ class Deconvolution:
             self.element_size_mm = simulation_engine.element_size_mm
             self.n_pixels = 256  # keep constant for timepix detector
             self.pixel_size = 0.0055  # cm # keep constant for timepix detector
-            self.experiment = True  # TODO fix this, temporary
+            self.experiment = False  # TODO fix this, temporary
         else:
             self.experiment = True
             self.raw_heatmap = experiment_data
@@ -125,10 +124,10 @@ class Deconvolution:
         """
 
         # plot transpose for visualization
-        plt.imshow(heatmap.T, origin="upper", cmap=cmap, vmax=125000)
+        plt.imshow(heatmap.T, origin="upper", cmap=cmap)
         plt.colorbar(label=label)
-        plt.xlabel('pixel')
-        plt.ylabel('pixel')
+        plt.xlabel("pixel")
+        plt.ylabel("pixel")
         plt.savefig(save_name, dpi=300)
         plt.close()
 
@@ -171,7 +170,7 @@ class Deconvolution:
             check = 0
         else:
             check = 1
-        #check = 0
+        # check = 0
         decoder = get_decoder_MURA(
             self.mask, self.mura_elements, holes_inv=False, check=check
         )
@@ -315,9 +314,9 @@ class Deconvolution:
                 linestyles="--",
                 colors=hex_list[1],
             )
-            plt.xlabel('pixel')
-            plt.ylabel('signal')
-            #plt.ylim([1e6,5e6])
+            plt.xlabel("pixel")
+            plt.ylabel("signal")
+            # plt.ylim([1e6,5e6])
 
             # plt.hlines(
             #    quarter_val,
@@ -396,7 +395,7 @@ class Deconvolution:
             self.get_raw()
 
         if plot_raw_heatmap:
-            self.plot_heatmap(self.raw_heatmap, save_name=save_raw_heatmap, vmax=vmax)
+            self.plot_heatmap(self.raw_heatmap, save_name=save_raw_heatmap)
 
         # get mask and decoder
         self.get_mask()
@@ -416,7 +415,6 @@ class Deconvolution:
                 self.deconvolved_image,
                 save_name=save_deconvolve_heatmap,
                 label="signal",
-                vmax=vmax,
             )
 
         snr = np.amax(np.abs(self.deconvolved_image)) / np.std(
@@ -443,7 +441,7 @@ class Deconvolution:
         # self.signal = np.fliplr(self.deconvolved_image)[:, 536]
         self.signal = np.sum(self.deconvolved_image, axis=1)
         # normalized signal
-        #self.signal = np.divide(self.deconvolved_image[np.shape(self.deconvolved_image)[0]//2,:], np.max(self.deconvolved_image[np.shape(self.deconvolved_image)[0]//2,:]))
+        # self.signal = np.divide(self.deconvolved_image[np.shape(self.deconvolved_image)[0]//2,:], np.max(self.deconvolved_image[np.shape(self.deconvolved_image)[0]//2,:]))
 
         # self.signal = self.deconvolved_image[max_col, :]
         # average of strip over the average background
