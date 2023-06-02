@@ -132,13 +132,13 @@ def write_pt_macro(
             f.write("/analysis/setFileName %s \n" % fname_tag)
             f.write("/analysis/h1/set 1 100 100 1000 keV \n")
             f.write(
-                "/analysis/h2/set 1 100 -5 5 cm none linear 100 -5 5 cm none linear \n"
+                f"/analysis/h2/set 1 100 {pos[0]-5} {pos[0]+5} cm none linear 100 {pos[1]-5} {pos[1]+5} cm none linear \n"
             )
             f.write(
-                "/analysis/h2/set 2 100 -5 5 cm none linear 100 -5 5 cm none linear \n"
+                f"/analysis/h2/set 2 100 {pos[1]-5} {pos[1]+5} cm none linear 100 {pos[2]-5} {pos[2]+5} cm none linear \n"
             )
             f.write(
-                "/analysis/h2/set 3 100 -5 5 cm none linear 100 -5 5 cm none linear \n"
+                f"/analysis/h2/set 3 100 {pos[2]-5} {pos[2]+5} cm none linear 100 {pos[0]-5} {pos[0]+5} cm none linear \n"
             )
             f.write(
                 "/analysis/h2/set 4 120 0 360 deg none linear 100 -1 1 none none linear \n"
@@ -217,6 +217,7 @@ def write_sphere_macro(
     ene_max_keV: float,
     macro_directory: str = "/home/rileyannereid/workspace/geant4/EPAD_geant4/macros",
     progress_mod: int = 1000,
+    fname_tag: str = "test",
 ) -> None:
     """
     create macro file for a point source (or multiple point sources)
@@ -247,14 +248,16 @@ def write_sphere_macro(
         f.write("/gps/pos/radius %.2f cm \n" % radius_cm)
 
         # center chosen to align with pinhole (maybe change this?)
-        f.write("/gps/pos/centre 0 0 497.91 cm \n")
+        # 499.935 is the front face of detector 1
+        f.write("/gps/pos/centre 0 0 499.935 cm \n")
+        pos = [0, 0, 499.935]
 
         # write the confinement to the volume
         f.write("/gps/pos/confine fovCapPV \n")
 
         f.write("/gps/ang/type cos \n")
-        # f.write("/gps/ang/mintheta 0 deg \n")
-        # f.write("/gps/ang/maxtheta 90 deg \n")
+        f.write("/gps/ang/mintheta 0 deg \n")
+        f.write("/gps/ang/maxtheta 90 deg \n")
 
         f.write("/gps/ene/type %s \n" % ene_type)
         if ene_type == "Mono":
@@ -262,7 +265,24 @@ def write_sphere_macro(
         else:
             f.write("/gps/ene/min %.2f keV \n" % ene_min_keV)
             f.write("/gps/ene/max %.2f keV \n" % ene_max_keV)
+        f.write("/analysis/setFileName %s \n" % fname_tag)
 
+        f.write("/analysis/h1/set 1 100 100 1000 keV \n")
+        f.write(
+            f"/analysis/h2/set 1 100 {pos[0]-5} {pos[0]+5} cm none linear 100 {pos[1]-5} {pos[1]+5} cm none linear \n"
+        )
+        f.write(
+            f"/analysis/h2/set 2 100 {pos[1]-5} {pos[1]+5} cm none linear 100 {pos[2]-5} {pos[2]+5} cm none linear \n"
+        )
+        f.write(
+            f"/analysis/h2/set 3 100 {pos[2]-5} {pos[2]+5} cm none linear 100 {pos[0]-5} {pos[0]+5} cm none linear \n"
+        )
+        f.write(
+            "/analysis/h2/set 4 120 0 360 deg none linear 100 -1 1 none none linear \n"
+        )
+        f.write(
+            "/analysis/h2/set 5 120 0 360 deg none linear  90 0 180 deg none linear \n"
+        )
         # get a progress bar
         f.write("/run/printProgress %d \n" % int(progress_mod))
         f.write("/run/beamOn %d \n" % int(n_particles))
