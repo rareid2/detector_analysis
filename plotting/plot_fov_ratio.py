@@ -4,11 +4,12 @@ from plot_settings import *
 import matplotlib.pyplot as plt
 plt.rcParams.update({'font.size': 14})
 
-    """plot the size of the fully and partialy coded fov
-    """
+"""plot the size of the fully and partialy coded fov
+"""
 
 det_size_cm = 1.408 # cm
 distances = np.flip(np.linspace(0.1*2*det_size_cm,10*2*det_size_cm,50))
+distances = np.array([2])
 fnumber = distances / (2*det_size_cm)
 
 hex_list = ["#023047","#219EBC","#FFB703","#FB8500","#F15025"]

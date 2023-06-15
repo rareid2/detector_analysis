@@ -1,11 +1,12 @@
 import matplotlib.pyplot as plt
+from matplotlib.colors import LogNorm
 import matplotlib.ticker as mtick
 from numpy.typing import NDArray
 
 from plotting.plot_settings import *
 
-    """plot data collected in experiment with minipix edu
-    """
+"""plot data collected in experiment with minipix edu
+"""
 def plot_four_subplots(
     raw_data: NDArray[np.uint16] = None,
     cleaned_data: NDArray[np.uint16] = None,
@@ -21,7 +22,7 @@ def plot_four_subplots(
     image = ax[0, 1].imshow(cleaned_data, cmap=cmap, vmin=vmins[0], vmax=vmaxes[0])
     image1 = ax[1, 0].imshow(resampled_data, cmap=cmap, vmin=vmins[0], vmax=vmaxes[0])
 
-    image = ax[1, 1].imshow(deconvolved_image, cmap=cmap, vmin=vmins[1], vmax=vmaxes[1])
+    image = ax[1, 1].imshow(deconvolved_image, cmap=cmap,norm=LogNorm())
 
     ax[0, 0].set_title("Data")
     ax[0, 1].set_title("Background Removed")
@@ -37,6 +38,7 @@ def plot_four_subplots(
     fig.tight_layout()
 
     # damn colorbar
+    """
     fig.subplots_adjust(right=0.55, wspace=0.005, hspace=0.2)
     cbar_ax = fig.add_axes([0.55, 0.09, 0.04, 0.85])
     cbar = fig.colorbar(image1, cax=cbar_ax)
@@ -65,6 +67,9 @@ def plot_four_subplots(
     plt.text(1.75, 2050,'signal')
 
     # plt.text(-17,30,'%s' % version, fontsize=16)
+    """
+
+    plt.colorbar(image)
 
     plt.savefig(
         "../experiment_results/%s.png" % save_name, dpi=500, bbox_inches="tight"

@@ -13,13 +13,13 @@ from experiment_constants import *
 
 two_sources = False
 # -------------------- set experiment set up ----------------------
-isotope = "background"
-frames = 360
+isotope = "Cd109Co57Eu152"
+frames = 125
 exposure_s = 1.0
-source_detector_cm = 0
-mask_detector_cm = 0
+source_detector_cm = 38.1
+mask_detector_cm = 1.91
 offset_deg1 = 0
-n_files = 20
+n_files = 31
 
 max_energy_keV_spectra = 80
 bin_interval = int(max_energy_keV_spectra // 2)
@@ -27,13 +27,13 @@ bins = np.linspace(
     0, max_energy_keV_spectra + int(max_energy_keV_spectra / bin_interval), bin_interval
 )
 
-min_energy_keV = 19
-max_energy_keV = 27
+min_energy_keV = 11
+max_energy_keV = 16
 
 if isotope == "background":
     data_folder = "background-testing/box/"
 elif offset_deg1 == 0:
-    data_folder = "fwhm/%dcm/" % round(mask_detector_cm)
+    data_folder = "multiple-sources/"
     #data_folder = "long-exposures/%dpt%ddeg" % (
     #    offset_deg1,
     #    10 * (offset_deg1 % 1),
@@ -256,8 +256,6 @@ if isotope != "background":
     plt.savefig("../experiment_results/%s" % plot_fname,dpi=300,transparent=True)
     """
     
-np.savetxt('background-timepix-data.txt', background_spectra)
-np.savetxt('background-timepix-bins.txt', bincenters)
 
 # ---------------------- finally plot it!----------------------
 if isotope == "background":
@@ -297,7 +295,7 @@ else:
         10 * (offset_deg1 % 1),
     )
     #plot_fname = my_hits.fname[:-6] + '-alignment'
-    vmaxes = [3, 2e3]
+    vmaxes = [100, 10000]
     plot_four_subplots(
         raw_data=raw_data,
         cleaned_data=cleaned_data_all,
