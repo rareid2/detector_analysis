@@ -1,16 +1,17 @@
 from simulation_engine import SimulationEngine
 from hits import Hits
+from plotting.plot_settings import *
 
 import numpy as np
 from numpy.typing import NDArray
 from typing import Tuple
 import matplotlib.pyplot as plt
 from scipy.ndimage import zoom
+from scipy.signal import peak_widths, find_peaks
 import sys
 
 sys.path.insert(1, "../coded_aperture_mask_designs")
 from util_fncs import makeMURA, make_mosaic_MURA, get_decoder_MURA
-from plotting.plot_settings import *
 
 
 class Deconvolution:
@@ -124,7 +125,7 @@ class Deconvolution:
         """
 
         # plot transpose for visualization
-        plt.imshow(heatmap.T, origin="upper", cmap=cmap)
+        plt.imshow(heatmap.T, origin="upper", cmap=cmap, vmax=vmax)
         plt.colorbar(label=label)
         plt.xlabel("pixel")
         plt.ylabel("pixel")
@@ -170,7 +171,6 @@ class Deconvolution:
             check = 0
         else:
             check = 1
-        # check = 0
         decoder = get_decoder_MURA(
             self.mask, self.mura_elements, holes_inv=False, check=check
         )
@@ -334,8 +334,6 @@ class Deconvolution:
         return resolved
 
     def FWHM(self):
-        from scipy.signal import peak_widths, find_peaks
-
         peaks, _ = find_peaks(self.signal)
 
         # just find the width of the center peak
@@ -361,6 +359,7 @@ class Deconvolution:
         condition: str = "half_val",
         vmax: float = None,
         experiment: bool = False,
+        normalize_signal: bool = True,
     ) -> bool:
         """
         perform all the steps to deconvolve a raw image
@@ -383,10 +382,14 @@ class Deconvolution:
         """
 
         self.downsample = downsample
-        self.trim = trim
-        self.resample_n_pixels = int(
-            (self.n_pixels - (self.trim * 2)) / self.downsample
-        )
+        if trim:
+            self.trim = trim
+            self.resample_n_pixels = int(
+                (self.n_pixels - (self.trim * 2)) / self.downsample
+            )
+        else:
+            self.trim = trim
+            self.resample_n_pixels = self.downsample
 
         # shift origin and remove unused pixels
         # data from experiment does not need to be shifted
@@ -395,7 +398,7 @@ class Deconvolution:
             self.get_raw()
 
         if plot_raw_heatmap:
-            self.plot_heatmap(self.raw_heatmap, save_name=save_raw_heatmap)
+            self.plot_heatmap(self.raw_heatmap, save_name=save_raw_heatmap, vmax=vmax)
 
         # get mask and decoder
         self.get_mask()
@@ -434,15 +437,13 @@ class Deconvolution:
             print("issue with getting the peak of that")
             max_col = 121
             peak_loc = 10
-        # if np.shape(max_col)[0] > 1:
-        #    max_col = max_col[0]
 
-        # self.signal = np.fliplr(self.deconvolved_image)[:, int(max_col)]
-        # self.signal = np.fliplr(self.deconvolved_image)[:, 536]
-        self.signal = np.sum(self.deconvolved_image, axis=1)
+        self.signal = np.sum(self.raw_heatmap, axis=0) / self.resample_n_pixels
+
         # normalized signal
+        if normalize_signal:
+            self.signal = self.signal / np.max(self.signal)
         # self.signal = np.divide(self.deconvolved_image[np.shape(self.deconvolved_image)[0]//2,:], np.max(self.deconvolved_image[np.shape(self.deconvolved_image)[0]//2,:]))
-
         # self.signal = self.deconvolved_image[max_col, :]
         # average of strip over the average background
         # axis 1 = ROW
@@ -465,7 +466,7 @@ class Deconvolution:
         else:
             resolved = None
 
-        return resolved, self.deconvolved_image, self.raw_heatmap, self.FWHM()
+        return resolved
 
     """ # TODO! move these to a new script 
     def plot_flux_signal(self, ax, simulation_engine, fname):

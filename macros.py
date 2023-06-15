@@ -249,8 +249,8 @@ def write_sphere_macro(
 
         # center chosen to align with pinhole (maybe change this?)
         # 499.935 is the front face of detector 1
-        f.write("/gps/pos/centre 0 0 499.935 cm \n")
-        pos = [0, 0, 499.935]
+        f.write("/gps/pos/centre 0 0 498.91 cm \n")
+        pos = [0, 0, 498.91]
 
         # write the confinement to the volume
         f.write("/gps/pos/confine fovCapPV \n")
