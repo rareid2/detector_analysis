@@ -50,7 +50,6 @@ thickness = 500  # um
 distance = 1  # cm
 
 n_particles = 1e9
-
 # --------------set up simulation---------------
 simulation_engine.set_config(
     det1_thickness_um=300,
@@ -70,10 +69,8 @@ energy_type = "Mono"
 energy_level = 500  # keV
 
 # --------------set up data naming---------------
-fname_tag = f"sphere-ca-rotate"
-fname = (
-    f"../simulation-data/{fname_tag}_{n_particles:.2E}_{energy_type}_{energy_level}.csv"
-)
+fname_tag = f"coded-aperture-{i}"
+fname = f"../simulation-data/{fname_tag}_{n_particles:.2E}_{energy_type}_{energy_level}.csv"
 
 simulation_engine.set_macro(
     n_particles=n_particles,
@@ -95,13 +92,13 @@ myhits.get_det_hits()
 deconvolver = Deconvolution(myhits, simulation_engine)
 
 # directory to save results in
-results_dir = "../simulation-results/validating-iso/"
+results_dir = "../simulation-results/iso-flux/"
 results_tag = f"{fname_tag}_{n_particles:.2E}_{energy_type}_{energy_level}"
 results_save = results_dir + results_tag
 
 deconvolver.deconvolve(
     downsample=2,
-    rtim=trim,
+    trim=trim,
     vmax=None,
     plot_deconvolved_heatmap=True,
     plot_raw_heatmap=True,
@@ -109,5 +106,5 @@ deconvolver.deconvolve(
     save_deconvolve_heatmap=results_save + "_dc.png",
     plot_signal_peak=True,
     plot_conditions=False,
-    save_peak=results_save + "peak.png",
+    save_peak=results_save + "_peak.png",
 )
