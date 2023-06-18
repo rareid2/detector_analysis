@@ -106,6 +106,26 @@ class Deconvolution:
 
         return heatmap
 
+    def apply_dist(self, dist_type):
+        """ 
+        apply distribution to a raw heatmap
+        """
+
+        if dist_type == 'sine':
+            # create a sine wave
+            det_dimension = np.linspace(-1 * self.det_size_cm / 2, self.det_size_cm / 2, self.resample_n_pixels)
+            fov_dimension = np.arctan(det_dimension / 1)
+            
+            new_heatmap = np.zeros((self.resample_n_pixels,self.resample_n_pixels))
+            for i in range(0, self.resample_n_pixels):
+                row = self.raw_heatmap[i,:]
+                sine_wave = np.sin(np.deg2rad(90) + fov_dimension)
+                
+                new_row = np.multiply(row,sine_wave)
+                new_heatmap[:,i] = new_row
+
+        self.raw_heatmap = new_heatmap
+
     def plot_heatmap(
         self,
         heatmap: NDArray[np.uint16],
@@ -359,7 +379,9 @@ class Deconvolution:
         condition: str = "half_val",
         vmax: float = None,
         experiment: bool = False,
-        normalize_signal: bool = True,
+        normalize_signal: bool = False,
+        apply_distribution: bool = False,
+        dist_type: str = 'sine'
     ) -> bool:
         """
         perform all the steps to deconvolve a raw image
@@ -396,6 +418,8 @@ class Deconvolution:
         if not experiment:
             self.shift_pos()
             self.get_raw()
+            if apply_distribution:
+                self.apply_dist(dist_type)
 
         if plot_raw_heatmap:
             self.plot_heatmap(self.raw_heatmap, save_name=save_raw_heatmap, vmax=vmax)
@@ -438,7 +462,7 @@ class Deconvolution:
             max_col = 121
             peak_loc = 10
 
-        self.signal = np.sum(self.raw_heatmap, axis=0) / self.resample_n_pixels
+        self.signal = np.sum(self.raw_heatmap, axis=1) / self.resample_n_pixels
 
         # normalized signal
         if normalize_signal:
