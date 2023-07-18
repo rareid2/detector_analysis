@@ -381,7 +381,8 @@ class Deconvolution:
         experiment: bool = False,
         normalize_signal: bool = False,
         apply_distribution: bool = False,
-        dist_type: str = 'sine'
+        dist_type: str = 'sine',
+        axis: int = 0,
     ) -> bool:
         """
         perform all the steps to deconvolve a raw image
@@ -462,7 +463,7 @@ class Deconvolution:
             max_col = 121
             peak_loc = 10
 
-        self.signal = np.sum(self.raw_heatmap, axis=1) / self.resample_n_pixels
+        self.signal = np.sum(self.deconvolved_image, axis=axis) / self.resample_n_pixels
 
         # normalized signal
         if normalize_signal:
