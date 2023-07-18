@@ -49,7 +49,8 @@ thickness = 500  # um
 # focal length
 distance = 1  # cm
 
-n_particles = 1e9
+n_particles = 1e8
+radius_cm = 3.25
 # --------------set up simulation---------------
 simulation_engine.set_config(
     det1_thickness_um=300,
@@ -62,6 +63,7 @@ simulation_engine.set_config(
     element_size_mm=element_size,
     mosaic=mosaic,
     mask_size=mask_size,
+    radius_cm=radius_cm,
 )
 
 # --------------set up source---------------
@@ -69,16 +71,19 @@ energy_type = "Mono"
 energy_level = 500  # keV
 
 # --------------set up data naming---------------
-fname_tag = f"coded-aperture-{i}"
-fname = f"../simulation-data/{fname_tag}_{n_particles:.2E}_{energy_type}_{energy_level}.csv"
+fname_tag = f"flat-field-test"
+fname = (
+    f"../simulation-data/{fname_tag}_{n_particles:.2E}_{energy_type}_{energy_level}.csv"
+)
 
 simulation_engine.set_macro(
     n_particles=n_particles,
     energy_keV=[energy_type, energy_level, None],
     sphere=True,
-    radius_cm=3.25,
+    radius_cm=radius_cm,
     progress_mod=int(n_particles / 10),  # set with 10 steps
     fname_tag=fname_tag,
+    dist=None,
 )
 
 # --------------RUN---------------
@@ -92,12 +97,12 @@ myhits.get_det_hits()
 deconvolver = Deconvolution(myhits, simulation_engine)
 
 # directory to save results in
-results_dir = "../simulation-results/iso-flux/"
+results_dir = "../simulation-results/flat-field/"
 results_tag = f"{fname_tag}_{n_particles:.2E}_{energy_type}_{energy_level}"
 results_save = results_dir + results_tag
 
 deconvolver.deconvolve(
-    downsample=2,
+    downsample=8,
     trim=trim,
     vmax=None,
     plot_deconvolved_heatmap=True,
@@ -107,4 +112,6 @@ deconvolver.deconvolve(
     plot_signal_peak=True,
     plot_conditions=False,
     save_peak=results_save + "_peak.png",
+    normalize_signal=True,
+    axis=1,
 )

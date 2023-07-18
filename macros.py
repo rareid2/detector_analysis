@@ -3,7 +3,7 @@
 # run_pt_src.mac (ca-pt-src)
 # run_angle_beam.mac (two-detectors)
 
-import os
+import os, math
 import numpy as np
 from typing import List
 
@@ -218,6 +218,9 @@ def write_sphere_macro(
     macro_directory: str = "/home/rileyannereid/workspace/geant4/EPAD_geant4/macros",
     progress_mod: int = 1000,
     fname_tag: str = "test",
+    dist: str = None,
+    ca_pos: float = 498.91,
+    confine:bool =False
 ) -> None:
     """
     create macro file for a point source (or multiple point sources)
@@ -235,7 +238,7 @@ def write_sphere_macro(
     macro_path = os.path.join(macro_directory, mf)
 
     with open(macro_path, "w") as f:
-        f.write("/run/numberOfThreads 40 \n")
+        f.write("/run/numberOfThreads 12 \n")
         f.write("/run/initialize \n")
         f.write("/control/verbose 0 \n")
         f.write("/run/verbose 0 \n")
@@ -245,19 +248,26 @@ def write_sphere_macro(
         f.write("/gps/particle e- \n")
         f.write("/gps/pos/type Surface \n")
         f.write("/gps/pos/shape Sphere \n")
-        f.write("/gps/pos/radius %.2f cm \n" % radius_cm)
+        f.write(f"/gps/pos/radius {radius_cm} cm \n")
 
         # center chosen to align with pinhole (maybe change this?)
         # 499.935 is the front face of detector 1
-        f.write("/gps/pos/centre 0 0 498.91 cm \n")
-        pos = [0, 0, 498.91]
+        f.write(f"/gps/pos/centre 0 0 {ca_pos} cm \n")
+        pos = [0, 0, ca_pos]
 
         # write the confinement to the volume
-        f.write("/gps/pos/confine fovCapPV \n")
+        if confine:
+            f.write("/gps/pos/confine fovCapPV \n")
 
-        f.write("/gps/ang/type cos \n")
-        f.write("/gps/ang/mintheta 0 deg \n")
-        f.write("/gps/ang/maxtheta 90 deg \n")
+        # if using user defined distribution
+        if dist:
+            f.write("/gps/ang/surfnorm false \n")
+            f.write("/gps/hist/type theta \n")
+            f.write("/gps/hist/file src/sine.txt \n")
+        else:
+            f.write("/gps/ang/type cos \n")
+            f.write("/gps/ang/mintheta 0 deg \n")
+            f.write("/gps/ang/maxtheta 90 deg \n")
 
         f.write("/gps/ene/type %s \n" % ene_type)
         if ene_type == "Mono":
@@ -265,7 +275,7 @@ def write_sphere_macro(
         else:
             f.write("/gps/ene/min %.2f keV \n" % ene_min_keV)
             f.write("/gps/ene/max %.2f keV \n" % ene_max_keV)
-        f.write("/analysis/setFileName %s \n" % fname_tag)
+        f.write("/analysis/setFileName test \n")
 
         f.write("/analysis/h1/set 1 100 100 1000 keV \n")
         f.write(
@@ -291,3 +301,18 @@ def write_sphere_macro(
     print("wrote ", macro_path)
 
     return mf
+
+
+def generate_hist():
+    # write the file called
+    with open("../EPAD_geant4/src/sine.txt", "w") as file:
+        # Calculate the increment for theta
+        delta_theta = (math.pi / 2) / 99
+
+        # Iterate from 0 to pi and write each row
+        for i in range(100):
+            theta = i * delta_theta
+            sin_theta = math.sin(theta)
+            file.write(f"{theta} {sin_theta}\n")
+
+    file.close()

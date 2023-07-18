@@ -111,6 +111,7 @@ class SimulationEngine:
         element_size_mm: float = 0.66,
         mosaic: bool = True,
         mask_size: float = None,
+        radius_cm: float = None,
     ) -> None:
         """
         sets all the config parameters based on sim type and writes them if option selected
@@ -161,6 +162,7 @@ class SimulationEngine:
                     element_size_mm=element_size_mm,
                     mask_size_mm=self.mask_size,
                     aperture_filename=self.aperture_filename,
+                    radius_cm=radius_cm,
                 )
 
         return
@@ -176,6 +178,8 @@ class SimulationEngine:
         radius_cm: float = 25,
         progress_mod: int = 1000,
         fname_tag: str = "test",
+        dist: str = None,
+        confine: bool = False,
     ) -> None:
         """
         create macro file based on simulation type -- see macros.py for function defs
@@ -186,6 +190,21 @@ class SimulationEngine:
         # assign for later use
         self.n_particles = n_particles
         self.radius_cm = radius_cm
+
+        # we need the coded aperture position to center the sphere
+        with open(os.path.join(EPAD_dir, "coded_aperture_position.txt"), "r") as file:
+            # Read the first line and ignore it (assuming it's not the number we want).
+            file.readline()
+
+            # Read the number from the second line and convert it to a float (or int if needed).
+            second_line = file.readline().strip()
+
+            if not second_line:
+                ca_pos = -499.95
+            else:
+                ca_pos = (
+                    round(float(second_line) / 10, 3) + 0.001  # bump but not sure why
+                )  # Use int() if the number is an integer.
 
         if self.write_files:
             if self.construct == "TD" and self.source == "PS":
@@ -203,6 +222,9 @@ class SimulationEngine:
                     ene_max_keV=energy_keV[2],
                     progress_mod=progress_mod,
                     fname_tag=fname_tag,
+                    dist=dist,
+                    ca_pos=ca_pos,
+                    confine=confine,
                 )
             elif self.construct == "CA" and self.source == "PS" and sphere == False:
                 macro_file = write_pt_macro(
@@ -270,6 +292,7 @@ class SimulationEngine:
         fname: str = "../simulation-data/hits.csv",
         build: bool = True,
         debug: bool = False,
+        rename: bool = True,
     ) -> None:  # need to add optoin to not rebuild each time (?)
         """
         run macro, rename data file after
@@ -293,7 +316,8 @@ class SimulationEngine:
         os.system(cmd)
         os.chdir(cwd)
 
-        self.rename_hits(fname)
+        if rename:
+            self.rename_hits(fname)
 
         print("simulation complete")
 
