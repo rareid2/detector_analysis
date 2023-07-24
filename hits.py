@@ -89,13 +89,15 @@ class Hits:
         else:
             self.detector_hits = pd.read_csv(
                 self.fname,
-                names=["det", "x", "y", "z", "energy"],
+                names=["det", "x", "y", "z", "energy", "ID", "name"],
                 dtype={
                     "det": np.int8,
                     "x": np.float64,
                     "y": np.float64,
                     "z": np.float64,
                     "energy": np.float64,
+                    "ID": np.int8,
+                    "name": str
                 },
                 delimiter=",",
                 on_bad_lines="skip",
