@@ -203,7 +203,7 @@ class SimulationEngine:
                 ca_pos = -499.95
             else:
                 ca_pos = (
-                    round(float(second_line) / 10, 3) + 0.001  # bump but not sure why
+                    round(float(second_line) / 10, 3)  # bump but not sure why
                 )  # Use int() if the number is an integer.
 
         if self.write_files:
@@ -225,6 +225,7 @@ class SimulationEngine:
                     dist=dist,
                     ca_pos=ca_pos,
                     confine=confine,
+                    world_offset=self.world_offset,
                 )
             elif self.construct == "CA" and self.source == "PS" and sphere == False:
                 macro_file = write_pt_macro(
