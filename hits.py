@@ -190,7 +190,7 @@ class Hits:
         return hits_dict
 
     # get hits for generalized setup in geant4
-    def get_det_hits(self, remove_secondaries: bool = False) -> dict:
+    def get_det_hits(self, remove_secondaries: bool = False, second_axis: "y") -> dict:
         """
         return a dictionary containing hits on front detector
 
@@ -202,14 +202,14 @@ class Hits:
         posX = []
         posY = []
         energies = []
-        detector_offset = 1111 * 0.45 - (0.03 / 2)
+        # detector_offset = 1111 * 0.45 - (0.03 / 2)
         for count, el in enumerate(self.detector_hits["det"]):
             # only get hits on the first detector
             if el == 1 and remove_secondaries != True:
                 xpos = self.detector_hits["x"][count]
-                zpos = (
-                    self.detector_hits["z"][count] - detector_offset
-                )  # change if rotated!
+                zpos = self.detector_hits[second_axis][
+                    count
+                ]  # change to z and use - detector_offset if y align
                 energy_kev = self.detector_hits["energy"][count]
 
                 # save
@@ -223,7 +223,7 @@ class Hits:
                     and self.detector_hits["name"][count] == "e-"
                 ):
                     xpos = self.detector_hits["x"][count]
-                    zpos = self.detector_hits["y"][count]
+                    zpos = self.detector_hits[second_axis][count]
                     energy_kev = self.detector_hits["energy"][count]
 
                     # save
