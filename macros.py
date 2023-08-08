@@ -220,7 +220,8 @@ def write_sphere_macro(
     fname_tag: str = "test",
     dist: str = None,
     ca_pos: float = 498.91,
-    confine:bool =False
+    confine: bool = False,
+    world_offset: float = 499.95,
 ) -> None:
     """
     create macro file for a point source (or multiple point sources)
@@ -252,6 +253,7 @@ def write_sphere_macro(
 
         # center chosen to align with pinhole (maybe change this?)
         # 499.935 is the front face of detector 1
+        # f.write(f"/gps/pos/centre 0 {ca_pos} {world_offset} cm \n") #- for y align
         f.write(f"/gps/pos/centre 0 0 {ca_pos} cm \n")
         pos = [0, 0, ca_pos]
 
@@ -261,9 +263,68 @@ def write_sphere_macro(
 
         # if using user defined distribution
         if dist:
+            f.write("/gps/ang/type user \n")
+            # f.write("/gps/ang/rot1 -1 0 0 \n")
+            # f.write("/gps/ang/rot2 0 0 1 \n")
             f.write("/gps/ang/surfnorm false \n")
             f.write("/gps/hist/type theta \n")
-            f.write("/gps/hist/file src/sine.txt \n")
+
+            hist = [
+                "/gps/hist/point 0.0 0.0010030000000000002",
+                "/gps/hist/point 0.1282282715750936 0.003062",
+                "/gps/hist/point 0.19234240736264038 0.00505",
+                "/gps/hist/point 0.2564565431501872 0.007045",
+                "/gps/hist/point 0.32057067893773394 0.009104",
+                "/gps/hist/point 0.38468481472528077 0.010933",
+                "/gps/hist/point 0.4487989505128276 0.012954",
+                "/gps/hist/point 0.5129130863003744 0.014973",
+                "/gps/hist/point 0.5770272220879211 0.016564",
+                "/gps/hist/point 0.6411413578754679 0.018241000000000004",
+                "/gps/hist/point 0.7052554936630148 0.019721",
+                "/gps/hist/point 0.7693696294505615 0.021296",
+                "/gps/hist/point 0.8334837652381083 0.022819",
+                "/gps/hist/point 0.8975979010256552 0.024200000000000003",
+                "/gps/hist/point 0.9617120368132019 0.025671",
+                "/gps/hist/point 1.0258261726007487 0.027146999999999998",
+                "/gps/hist/point 1.0899403083882955 0.02792",
+                "/gps/hist/point 1.1540544441758422 0.029168",
+                "/gps/hist/point 1.218168579963389 0.030045000000000002",
+                "/gps/hist/point 1.2822827157509358 0.030493000000000003",
+                "/gps/hist/point 1.3463968515384828 0.031058000000000002",
+                "/gps/hist/point 1.4105109873260295 0.031564999999999996",
+                "/gps/hist/point 1.4746251231135763 0.03187",
+                "/gps/hist/point 1.538739258901123 0.032293",
+                "/gps/hist/point 1.6028533946886698 0.031845",
+                "/gps/hist/point 1.6669675304762166 0.032009",
+                "/gps/hist/point 1.7310816662637634 0.031861",
+                "/gps/hist/point 1.7951958020513104 0.031464",
+                "/gps/hist/point 1.8593099378388571 0.030916999999999997",
+                "/gps/hist/point 1.9234240736264039 0.030314",
+                "/gps/hist/point 1.9875382094139507 0.029705",
+                "/gps/hist/point 2.0516523452014974 0.028949999999999997",
+                "/gps/hist/point 2.1157664809890444 0.027985",
+                "/gps/hist/point 2.179880616776591 0.026889999999999997",
+                "/gps/hist/point 2.243994752564138 0.025942",
+                "/gps/hist/point 2.3081088883516845 0.024414999999999996",
+                "/gps/hist/point 2.3722230241392315 0.023016999999999996",
+                "/gps/hist/point 2.436337159926778 0.021287999999999998",
+                "/gps/hist/point 2.500451295714325 0.020052",
+                "/gps/hist/point 2.5645654315018716 0.018493",
+                "/gps/hist/point 2.6286795672894185 0.016702",
+                "/gps/hist/point 2.6927937030769655 0.014903",
+                "/gps/hist/point 2.756907838864512 0.012795",
+                "/gps/hist/point 2.821021974652059 0.010917",
+                "/gps/hist/point 2.8851361104396056 0.00908",
+                "/gps/hist/point 2.9492502462271526 0.007055",
+                "/gps/hist/point 3.013364382014699 0.005001",
+                "/gps/hist/point 3.077478517802246 0.0031040000000000004",
+                "/gps/hist/point 3.141592653589793 0.0011009999999999998",
+            ]
+
+            for h in hist:
+                f.write(f"{h} \n")
+            # f.write("/gps/hist/point 1.0472 1 \n")
+
         else:
             f.write("/gps/ang/type cos \n")
             f.write("/gps/ang/mintheta 0 deg \n")
@@ -275,7 +336,7 @@ def write_sphere_macro(
         else:
             f.write("/gps/ene/min %.2f keV \n" % ene_min_keV)
             f.write("/gps/ene/max %.2f keV \n" % ene_max_keV)
-        f.write("/analysis/setFileName test \n")
+        f.write(f"/analysis/setFileName {fname_tag} \n")
 
         f.write("/analysis/h1/set 1 100 100 1000 keV \n")
         f.write(
