@@ -14,7 +14,6 @@ class Hits:
         experiment_engine: ExperimentEngine = None,
         file_count: int = 0,
     ) -> None:
-
         # filename containing hits data
         self.fname = fname
 
@@ -64,7 +63,7 @@ class Hits:
             # self.hits_dict = {"data": lines_array}
             self.n_entries = len(np.where(lines_array > 0))
             # add another dictionary with experiment data (distances etc.)
-            #self.experiment_setup = experiment_setup
+            # self.experiment_setup = experiment_setup
 
             self.fname = fname
 
@@ -97,7 +96,7 @@ class Hits:
                     "z": np.float64,
                     "energy": np.float64,
                     "ID": np.int8,
-                    "name": str
+                    "name": str,
                 },
                 delimiter=",",
                 on_bad_lines="skip",
@@ -191,7 +190,7 @@ class Hits:
         return hits_dict
 
     # get hits for generalized setup in geant4
-    def get_det_hits(self) -> dict:
+    def get_det_hits(self, remove_secondaries: bool = False) -> dict:
         """
         return a dictionary containing hits on front detector
 
@@ -203,17 +202,36 @@ class Hits:
         posX = []
         posY = []
         energies = []
+        detector_offset = 1111 * 0.45 - (0.03 / 2)
         for count, el in enumerate(self.detector_hits["det"]):
             # only get hits on the first detector
-            if el == 1:
+            if el == 1 and remove_secondaries != True:
                 xpos = self.detector_hits["x"][count]
-                zpos = self.detector_hits["y"][count]
+                zpos = (
+                    self.detector_hits["z"][count] - detector_offset
+                )  # change if rotated!
                 energy_kev = self.detector_hits["energy"][count]
 
                 # save
                 posX.append(xpos)
                 posY.append(zpos)
                 energies.append(energy_kev)
+            # if checking for secondaries and want to remove them, only process electrons
+            elif el == 1 and remove_secondaries:
+                if (
+                    self.detector_hits["ID"][count] == 0
+                    and self.detector_hits["name"][count] == "e-"
+                ):
+                    xpos = self.detector_hits["x"][count]
+                    zpos = self.detector_hits["y"][count]
+                    energy_kev = self.detector_hits["energy"][count]
+
+                    # save
+                    posX.append(xpos)
+                    posY.append(zpos)
+                    energies.append(energy_kev)
+            else:
+                pass
 
         hits_pos = [(X, Y) for X, Y in zip(posX, posY)]
 
