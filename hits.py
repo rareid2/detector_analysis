@@ -190,7 +190,9 @@ class Hits:
         return hits_dict
 
     # get hits for generalized setup in geant4
-    def get_det_hits(self, remove_secondaries: bool = False, second_axis: "y") -> dict:
+    def get_det_hits(
+        self, remove_secondaries: bool = False, second_axis: str = "y"
+    ) -> dict:
         """
         return a dictionary containing hits on front detector
 
