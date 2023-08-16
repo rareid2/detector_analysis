@@ -204,19 +204,25 @@ class Hits:
         posX = []
         posY = []
         energies = []
-        # detector_offset = 1111 * 0.45 - (0.03 / 2)
+        detector_offset = 1111 * 0.45 - (0.03 / 2) # TODO: make this dynamic
         for count, el in enumerate(self.detector_hits["det"]):
             # only get hits on the first detector
             if el == 1 and remove_secondaries != True:
                 xpos = self.detector_hits["x"][count]
-                zpos = self.detector_hits[second_axis][
-                    count
-                ]  # change to z and use - detector_offset if y align
-                energy_kev = self.detector_hits["energy"][count]
+                ypos = self.detector_hits["y"][count]
+                zpos = self.detector_hits["z"][count]
 
-                # save
-                posX.append(xpos)
-                posY.append(zpos)
+                if second_axis == "z" and ypos == 0:
+                    posX.append(xpos)
+                    posY.append(zpos - detector_offset)
+                elif zpos == detector_offset:
+                    posX.append(xpos)
+                    posY.append(ypos)
+                else:
+                    pass 
+                
+                # get energy
+                energy_kev = self.detector_hits["energy"][count]
                 energies.append(energy_kev)
             # if checking for secondaries and want to remove them, only process electrons
             elif el == 1 and remove_secondaries:
@@ -225,12 +231,20 @@ class Hits:
                     and self.detector_hits["name"][count] == "e-"
                 ):
                     xpos = self.detector_hits["x"][count]
-                    zpos = self.detector_hits[second_axis][count]
-                    energy_kev = self.detector_hits["energy"][count]
+                    ypos = self.detector_hits["y"][count]
+                    zpos = self.detector_hits["z"][count]
 
-                    # save
-                    posX.append(xpos)
-                    posY.append(zpos)
+                    if second_axis == "z" and ypos == 0:
+                        posX.append(xpos)
+                        posY.append(zpos - detector_offset)
+                    elif zpos == detector_offset:
+                        posX.append(xpos)
+                        posY.append(ypos)
+                    else:
+                        pass 
+                    
+                    # get energy
+                    energy_kev = self.detector_hits["energy"][count]
                     energies.append(energy_kev)
             else:
                 pass
