@@ -215,7 +215,7 @@ class Hits:
                 if second_axis == "z" and ypos == 0.015:
                     posX.append(xpos)
                     posY.append(zpos - detector_offset)
-                elif zpos == detector_offset:
+                elif second_axis == "y" and zpos == detector_offset:
                     posX.append(xpos)
                     posY.append(ypos)
                 else:
@@ -237,7 +237,7 @@ class Hits:
                     if second_axis == "z" and ypos == 0.015:
                         posX.append(xpos)
                         posY.append(zpos - detector_offset)
-                    elif zpos == detector_offset:
+                    elif second_axis == "y" and zpos == detector_offset:
                         posX.append(xpos)
                         posY.append(ypos)
                     else:
