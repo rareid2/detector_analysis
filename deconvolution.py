@@ -102,27 +102,31 @@ class Deconvolution:
                 xxes, yxes, bins=int(self.downsample)
             )  # just for the pinhole case - remove extra
 
-        self.raw_heatmap = heatmap
+        self.raw_heatmap = (
+            heatmap  # [1:-1, 1:-1] # REMVOE THIS MOVING FORWARD ONLY FOR WEIRD STUFF
+        )
 
         return heatmap
 
     def apply_dist(self, dist_type):
-        """ 
+        """
         apply distribution to a raw heatmap
         """
 
-        if dist_type == 'sine':
+        if dist_type == "sine":
             # create a sine wave
-            det_dimension = np.linspace(-1 * self.det_size_cm / 2, self.det_size_cm / 2, self.resample_n_pixels)
+            det_dimension = np.linspace(
+                -1 * self.det_size_cm / 2, self.det_size_cm / 2, self.resample_n_pixels
+            )
             fov_dimension = np.arctan(det_dimension / 1)
-            
-            new_heatmap = np.zeros((self.resample_n_pixels,self.resample_n_pixels))
+
+            new_heatmap = np.zeros((self.resample_n_pixels, self.resample_n_pixels))
             for i in range(0, self.resample_n_pixels):
-                row = self.raw_heatmap[i,:]
+                row = self.raw_heatmap[i, :]
                 sine_wave = np.sin(np.deg2rad(90) + fov_dimension)
-                
-                new_row = np.multiply(row,sine_wave)
-                new_heatmap[:,i] = new_row
+
+                new_row = np.multiply(row, sine_wave)
+                new_heatmap[:, i] = new_row
 
         self.raw_heatmap = new_heatmap
 
@@ -381,7 +385,7 @@ class Deconvolution:
         experiment: bool = False,
         normalize_signal: bool = False,
         apply_distribution: bool = False,
-        dist_type: str = 'sine',
+        dist_type: str = "sine",
         axis: int = 0,
     ) -> bool:
         """
