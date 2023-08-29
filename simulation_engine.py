@@ -202,9 +202,8 @@ class SimulationEngine:
             if not second_line:
                 ca_pos = -499.95
             else:
-                ca_pos = (
-                    round(float(second_line) / 10, 3)  # bump but not sure why
-                )  # Use int() if the number is an integer.
+                ca_pos = round(float(second_line) / 10, 3)
+                # + 0.001  # bump but not sure why - dont need to y align
 
         if self.write_files:
             if self.construct == "TD" and self.source == "PS":
