@@ -187,7 +187,7 @@ class Deconvolution:
         if self.experiment:
             check = 1
         elif (
-            self.mura_elements == 67
+            self.mura_elements == 61
             or self.mura_elements == 31
             or self.mura_elements == 11
             or self.mura_elements == 7
@@ -447,6 +447,7 @@ class Deconvolution:
                 self.deconvolved_image,
                 save_name=save_deconvolve_heatmap,
                 label="signal",
+                vmax=vmax,
             )
 
         snr = np.amax(np.abs(self.deconvolved_image)) / np.std(
