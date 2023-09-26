@@ -3,9 +3,9 @@ from macros import (
     write_angle_beam_macro,
     write_PAD_macro,
     write_pt_macro,
-    write_sphere_macro,
+    write_surface_macro,
 )
-
+from typing import List, Any
 import os
 
 EPAD_dir = "/home/rileyannereid/workspace/geant4/EPAD_geant4"
@@ -28,7 +28,7 @@ class SimulationEngine:
         self.world_sizeXY = 1.1 * self.env_sizeXY
         self.world_sizeZ = 1.1 * self.env_sizeZ
         self.world_offset = self.env_sizeZ * 0.45
-        self.detector_placement = 0  # self.world_offset  # im cm
+        self.detector_placement = self.world_offset  # in cm
 
     def det_config(
         self,
@@ -174,12 +174,13 @@ class SimulationEngine:
         positions=[[0, 0, -500]],
         directions=[0],
         PAD_run: int = 1,
-        sphere: bool = False,
+        surface: bool = False,
         radius_cm: float = 25,
         progress_mod: int = 1000,
         fname_tag: str = "test",
-        dist: str = None,
         confine: bool = False,
+        detector_dim: float = 1.408,
+        theta: float = None,
     ) -> None:
         """
         create macro file based on simulation type -- see macros.py for function defs
@@ -212,8 +213,8 @@ class SimulationEngine:
                 )
                 # update energy
                 self.energy_keV = energy_keV
-            elif self.construct == "CA" and self.source == "PS" and sphere:
-                macro_file = write_sphere_macro(
+            elif self.construct == "CA" and self.source == "PS" and surface:
+                macro_file = write_surface_macro(
                     n_particles=n_particles,
                     radius_cm=self.radius_cm,
                     ene_type=energy_keV[0],
@@ -221,20 +222,22 @@ class SimulationEngine:
                     ene_max_keV=energy_keV[2],
                     progress_mod=progress_mod,
                     fname_tag=fname_tag,
-                    dist=dist,
+                    theta=theta,
                     ca_pos=ca_pos,
                     confine=confine,
                     world_offset=self.world_offset,
                 )
-            elif self.construct == "CA" and self.source == "PS" and sphere == False:
+            elif self.construct == "CA" and self.source == "PS" and surface == False:
                 macro_file = write_pt_macro(
                     n_particles=self.n_particles,
                     positions=positions,
                     rotations=directions,
                     energies_keV=energy_keV,
-                    detector_placement=self.detector_placement,
+                    detector_placement=self.detector_placement
+                    - (self.det1_thickness_um * 1e-4 / 2),
                     progress_mod=progress_mod,
                     fname_tag=fname_tag,
+                    detector_dim=detector_dim,
                 )
             else:
                 macro_file = write_PAD_macro(
