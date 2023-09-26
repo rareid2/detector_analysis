@@ -6,6 +6,7 @@ import numpy as np
 from numpy.typing import NDArray
 from typing import Tuple
 import matplotlib.pyplot as plt
+from matplotlib.colors import LogNorm
 from scipy.ndimage import zoom
 from scipy.signal import peak_widths, find_peaks
 import sys
@@ -368,6 +369,20 @@ class Deconvolution:
         results_half = peak_widths(self.signal, peaks, rel_height=0.5)
         return max(results_half[0])
 
+    def flat_field(self, flat_field_array):
+        """
+        flat field the deconvolved signal based on pixel number
+        """
+
+        # import the flat field response (txt file - 2D array)
+        # apply to each pixel
+        self.flat_field_signal = np.multiply(
+            self.deconvolved_image, 1 / flat_field_array
+        )
+        # replace
+        self.deconvolved_image = self.flat_field_signal
+        return
+
     def deconvolve(
         self,
         downsample: int = 1,
@@ -387,6 +402,7 @@ class Deconvolution:
         apply_distribution: bool = False,
         dist_type: str = "sine",
         axis: int = 0,
+        flat_field_array: NDArray = None,
     ) -> bool:
         """
         perform all the steps to deconvolve a raw image
@@ -442,6 +458,9 @@ class Deconvolution:
 
         # deconvolve
         self.fft_conv()
+
+        if flat_field_array is not None:
+            self.flat_field(flat_field_array)
         if plot_deconvolved_heatmap:
             self.plot_heatmap(
                 self.deconvolved_image,
