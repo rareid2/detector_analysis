@@ -7,6 +7,7 @@ from numpy.typing import NDArray
 from typing import Tuple
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
+from mpl_toolkits.mplot3d import Axes3D
 from scipy.ndimage import zoom
 from scipy.signal import peak_widths, find_peaks
 import sys
@@ -31,6 +32,7 @@ class Deconvolution:
             self.n_pixels = 256  # keep constant for timepix detector
             self.pixel_size = 0.0055  # cm # keep constant for timepix detector
             self.experiment = False  # TODO fix this, temporary
+            self.hits_data = hits.txt_hits
         else:
             self.experiment = True
             self.raw_heatmap = experiment_data
@@ -403,6 +405,7 @@ class Deconvolution:
         dist_type: str = "sine",
         axis: int = 0,
         flat_field_array: NDArray = None,
+        hits_txt: bool = False,
     ) -> bool:
         """
         perform all the steps to deconvolve a raw image
@@ -436,21 +439,24 @@ class Deconvolution:
 
         # shift origin and remove unused pixels
         # data from experiment does not need to be shifted
-        if not experiment:
+        if not experiment and not hits_txt:
             self.shift_pos()
             self.get_raw()
             if apply_distribution:
                 self.apply_dist(dist_type)
-
+        elif hits_txt:
+            self.raw_heatmap = self.hits_data
         if plot_raw_heatmap:
             self.plot_heatmap(self.raw_heatmap, save_name=save_raw_heatmap, vmax=vmax)
+
+        np.savetxt(f"{save_raw_heatmap[:-3]}txt", self.raw_heatmap)
 
         # get mask and decoder
         self.get_mask()
         self.get_decoder()
 
         # flip the heatmap over both axes bc point hole
-        rawIm = np.fliplr(np.flipud(self.raw_heatmap))
+        rawIm = np.fliplr(self.raw_heatmap)
 
         # reflect bc correlation needs to equal convolution
         rawIm = np.fliplr(rawIm)
@@ -468,7 +474,7 @@ class Deconvolution:
                 label="signal",
                 vmax=vmax,
             )
-
+        """
         snr = np.amax(np.abs(self.deconvolved_image)) / np.std(
             np.abs(self.deconvolved_image)
         )
@@ -514,8 +520,57 @@ class Deconvolution:
             _, resolved = self.check_resolved(condition)
         else:
             resolved = None
+        """
+        return
 
-        return resolved
+    def plot_3D_signal(self, save_name):
+        # Define the grid of x and y values
+        heatmap = self.deconvolved_image
+        noise = np.mean(heatmap[10:50, 10:50])
+        heatmap = heatmap - noise
+
+        x = np.arange(heatmap.shape[0])
+        y = np.arange(heatmap.shape[1])
+
+        range1 = 56
+        range2 = 70
+        X, Y = np.meshgrid(x[range1:range2], y[range1:range2])
+
+        # Create a 3D figure
+        plt.clf()
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection="3d")
+
+        # Create the surface plot!
+        surface = ax.plot_surface(
+            X, Y, heatmap[range1:range2, range1:range2], cmap=cmap, vmax=30000
+        )
+
+        # Add a color bar for reference
+        fig.colorbar(surface)
+
+        # Show the plot
+        ax.set_xlabel("pixel")
+        ax.set_ylabel("pixel")
+        ax.set_zlabel("signal")
+        # ax.set_zlim([np.amax(heatmap) / 2, np.amax(heatmap)])
+        plt.show()
+        # plt.savefig(save_name, dpi=300)
+
+    def calculate_fwhm(self):
+        data = self.deconvolved_image
+
+        # noise floor
+        noise = np.mean(data[5:55, 5:55])
+        data = data - noise
+
+        amp = np.max(data)
+        half_max = amp / 2.0
+
+        # find indices with values greater than or equal to half max
+        px = data[data >= half_max]
+
+        return len(px) + 1
 
     """ # TODO! move these to a new script 
     def plot_flux_signal(self, ax, simulation_engine, fname):

@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 from experiment_engine import ExperimentEngine
 from uncertainty import add_uncertainty
+from shapely.geometry import Point, Polygon
 
 
 class Hits:
@@ -13,10 +14,11 @@ class Hits:
         experiment_geant4: bool = False,
         experiment_engine: ExperimentEngine = None,
         file_count: int = 0,
+        txt_file: bool = False,
     ) -> None:
         # filename containing hits data
         self.fname = fname
-
+        self.txt_hits = None
         # ---------------------- parse the hits file -----------------------
 
         # if physical experiment data its already digitized
@@ -42,6 +44,7 @@ class Hits:
                 round(100 * (experiment_engine.mask_detector_cm % 1)),
                 file_count,
             )
+            fname = f"cd109-test_{file_count:03d}.txt"
             fname_full_path = os.path.join(experiment_engine.data_folder, fname)
             f = open(fname_full_path, "r")
 
@@ -83,6 +86,10 @@ class Hits:
                 engine="c",
             )
             self.n_entries = len(self.detector_hits["energy"])
+
+        elif txt_file:
+            self.txt_hits = np.loadtxt(self.fname)
+            self.n_entries = np.sum(self.txt_hits)
 
         # general geant4 simulations
         else:
@@ -392,7 +399,7 @@ class Hits:
         return
 
     def exclude_pcfov(
-        self, detector_dim, mask_dim, focal_length, sphere_radius, second_axis
+        self, detector_dim, mask_dim, focal_length, plane_distance, second_axis
     ):
         # create locations for sensor corners and mask corners
 
@@ -419,25 +426,19 @@ class Hits:
                 [
                     detector_dim / 2,
                     detector_dim / 2,
-                    -1 * focal_length,
+                    0,
                 ]
             )
-            mask0 = np.array([mask_dim / 2, mask_dim / 2, 0])
+            mask0 = np.array([mask_dim / 2, mask_dim / 2, -1 * focal_length])
 
-            pixel1 = np.array(
-                [-1 * detector_dim / 2, detector_dim / 2, -1 * focal_length]
-            )
-            mask1 = np.array([-1 * mask_dim / 2, mask_dim / 2, 0])
+            pixel1 = np.array([-1 * detector_dim / 2, detector_dim / 2, 0])
+            mask1 = np.array([-1 * mask_dim / 2, mask_dim / 2, -1 * focal_length])
 
-            pixel2 = np.array(
-                [detector_dim / 2, -1 * detector_dim / 2, -1 * focal_length]
-            )
-            mask2 = np.array([mask_dim / 2, -1 * mask_dim / 2, 0])
+            pixel2 = np.array([detector_dim / 2, -1 * detector_dim / 2, 0])
+            mask2 = np.array([mask_dim / 2, -1 * mask_dim / 2, -1 * focal_length])
 
-            pixel3 = np.array(
-                [-1 * detector_dim / 2, -1 * detector_dim / 2, -1 * focal_length]
-            )
-            mask3 = np.array([-1 * mask_dim / 2, -1 * mask_dim / 2, 0])
+            pixel3 = np.array([-1 * detector_dim / 2, -1 * detector_dim / 2, 0])
+            mask3 = np.array([-1 * mask_dim / 2, -1 * mask_dim / 2, -1 * focal_length])
         # Calculate the vector from point1 to point2
         vector0 = pixel0 - mask0
         vector1 = pixel1 - mask1
@@ -475,6 +476,23 @@ class Hits:
 
             return intersection_point
 
+        def ray_plane_intersection(ray_origin, ray_direction, plane_distance):
+            P0 = np.array([0, 0, -1 * plane_distance])
+            N = np.array([0, 0, 1])
+
+            dot_product = np.dot(ray_direction, N)
+            # Check if the vector is parallel to the plane
+            if abs(dot_product) < 1e-6:
+                print("Vector is parallel to the plane, no intersection.")
+                return
+            else:
+                # Calculate the parameter t at which the vector intersects the plane
+                t = np.dot(P0 - ray_origin, N) / dot_product
+
+                # Calculate the intersection point
+                intersection_point = ray_origin + t * ray_direction
+            return intersection_point
+
         # Define the ray's origin and direction
         pixels = [pixel0, pixel1, pixel2, pixel3]
         vectors = [vector0, vector1, vector2, vector3]
@@ -487,14 +505,35 @@ class Hits:
             ray_direction = vector
 
             # Define the sphere's center and radius
-            sphere_center = np.array([0.0, 0.0, 0.0])
+            # sphere_center = np.array([0.0, 0.0, 0.0])
 
             # Calculate the intersection point on the surface of the sphere
-            intersection_point = ray_sphere_intersection(
-                ray_origin, ray_direction, sphere_center, sphere_radius
+            intersection_point = ray_plane_intersection(
+                ray_origin, ray_direction, plane_distance
             )
             intersection_points.append(intersection_point)
+        # check if the point lies on the 2D polygon formed
+        polygon_coords = [(itp[0], itp[1]) for itp in intersection_points]
+        polygon_coords.append((intersection_points[0][0], intersection_points[0][1]))
+        polygon_coords[2], polygon_coords[3] = polygon_coords[3], polygon_coords[2]
+        src_polygon = Polygon(polygon_coords)
 
+        inside_idx = []
+        for vi, vtx in enumerate(self.hits_dict["Vertices"]):
+            point = Point(vtx[0], vtx[1])
+            if src_polygon.contains(point):
+                inside_idx.append(vi)
+            else:
+                # print(point)
+                pass
+
+        inside_hits = {}
+        # save only those inside
+        for key, array in self.hits_dict.items():
+            inside_hits[key] = [array[i] for i in inside_idx]
+
+        self.hits_dict = inside_hits
+        """
         # find the theta and phi extent from the intersection points
         theta_extents = []
         phi_extents = []
@@ -549,4 +588,5 @@ class Hits:
             inside_hits[key] = [array[i] for i in inside_idx]
 
         self.hits_dict = inside_hits
+        """
         return
