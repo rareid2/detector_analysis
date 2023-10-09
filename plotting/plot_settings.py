@@ -68,8 +68,9 @@ hex_list = [
 # hex_list = ["#023047","#219EBC","#FFB703","#FB8500","#F15025"]
 hex_list = ["#264653", "#2a9d8f", "#e9c46a", "#f4a261", "#e76f51"]
 hex_list = ["#ffbe0b", "#fb5607", "#ff006e", "#8338ec", "#3a86ff"]
-
-cmap = get_continuous_cmap(reversed(hex_list))
+hex_list = ['#05668d', '#028090', '#00a896', '#02c39a', '#f0f3bd']
+hex_list = ["#264653","#2a9d8f","#e9c46a","#f4a261","#e76f51"]
+cmap = get_continuous_cmap(hex_list)
 
 hex_colors = []
 for i in range(cmap.N):

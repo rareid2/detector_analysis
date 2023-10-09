@@ -3,7 +3,7 @@ from scipy import interpolate
 import matplotlib.pyplot as plt
 
 # Load x and y values from separate text files
-txt_folder = "/home/rileyannereid/workspace/geant4/simulation-results/aperture-collimation/geom-correction/"
+txt_folder = "/home/rileyannereid/workspace/geant4/simulation-results/aperture-collimation/61-2-400-d3-2p25/"
 zx = np.loadtxt(f"{txt_folder}x-sig.txt")
 zy = np.loadtxt(f"{txt_folder}y-sig.txt")
 zz = np.loadtxt(f"{txt_folder}xy-sig.txt")
@@ -73,8 +73,8 @@ other_diagonal = np.array([(i - 30, 30 - i) for i in range(0, 61, 2)])
 # other_diagonal = other_diagonal[1:-1]
 
 # Define the grid where you want to interpolate
-x_new = np.linspace(-30, 30, 61)
-y_new = np.linspace(-30, 30, 61)
+x_new = np.linspace(-30, 30, 122)
+y_new = np.linspace(-30, 30, 122)
 
 # x_new = x_new[2:-2]
 # y_new = y_new[2:-2]
@@ -111,7 +111,7 @@ plt.ylabel("Y")
 
 plt.subplot(1, 2, 2)
 plt.title("Interpolated Surface")
-plt.contourf(x_new_grid, y_new_grid, z_new, cmap="viridis", levels=100)
+plt.contourf(x_new_grid, y_new_grid, z_new, cmap="viridis", levels=100, vmax=1)
 plt.colorbar(label="Z Value")
 plt.xlabel("X")
 plt.ylabel("Y")
@@ -119,3 +119,43 @@ plt.ylabel("Y")
 plt.tight_layout()
 # plt.gca().set_aspect("equal")
 plt.savefig(f"{txt_folder}interpolation-corrected.png", dpi=300)
+
+# Create a 3D figure
+plt.clf()
+fig = plt.figure()
+ax = fig.add_subplot(111, projection="3d")
+
+# Create the surface plot!
+surface = ax.plot_surface(x_new_grid, y_new_grid, z_new, cmap="viridis")
+
+# Add a color bar for reference
+fig.colorbar(surface)
+
+# Show the plot
+ax.set_xlabel("pixel")
+ax.set_ylabel("pixel")
+ax.set_zlabel("signal")
+plt.savefig(f"{txt_folder}interpolation-corrected-3D.png", dpi=300)
+"""
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.optimize import curve_fit
+
+
+def func(x, a, c):
+    return a * (np.sin(np.sqrt(x[0] ** 2 + x[1] ** 2))) + c
+
+
+size = x_new_grid.shape
+x1_1d = x_new_grid.reshape((1, np.prod(size)))
+x2_1d = y_new_grid.reshape((1, np.prod(size)))
+
+xdata = np.vstack((x1_1d, x2_1d))
+
+Z_new = z_new.reshape(size)
+
+popt, pcov = curve_fit(func, xdata, z_new.flatten())
+
+z_fit = func(xdata, *popt)
+Z_fit = z_fit.reshape(size)
+"""

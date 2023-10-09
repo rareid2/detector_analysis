@@ -7,6 +7,8 @@ from plotting.plot_settings import *
 
 """plot data collected in experiment with minipix edu
 """
+
+
 def plot_four_subplots(
     raw_data: NDArray[np.uint16] = None,
     cleaned_data: NDArray[np.uint16] = None,
@@ -16,13 +18,12 @@ def plot_four_subplots(
     vmaxes: list = [100, 1e5],
     save_name: str = "plot_subplots",
 ):
-
     fig, ax = plt.subplots(2, 2, figsize=(10, 6))
     image = ax[0, 0].imshow(raw_data, cmap=cmap, vmin=vmins[0], vmax=vmaxes[0])
     image = ax[0, 1].imshow(cleaned_data, cmap=cmap, vmin=vmins[0], vmax=vmaxes[0])
     image1 = ax[1, 0].imshow(resampled_data, cmap=cmap, vmin=vmins[0], vmax=vmaxes[0])
 
-    image = ax[1, 1].imshow(deconvolved_image, cmap=cmap,norm=LogNorm())
+    image = ax[1, 1].imshow(deconvolved_image, cmap=cmap, norm=LogNorm())
 
     ax[0, 0].set_title("Data")
     ax[0, 1].set_title("Background Removed")
@@ -63,14 +64,12 @@ def plot_four_subplots(
     cbar.ax.set_yticklabels(yticks_counts, fontsize=10)
     ax2.set_yticklabels(yticks_signal, fontsize=10)
 
-    plt.text(-1.5, 2050,'counts')
-    plt.text(1.75, 2050,'signal')
-
-    # plt.text(-17,30,'%s' % version, fontsize=16)
+    plt.text(-1.5, 2050, "counts")
+    plt.text(1.75, 2050, "signal")
     """
+    # plt.text(-17,30,'%s' % version, fontsize=16)
 
-    plt.colorbar(image)
-
+    # plt.colorbar(image)
     plt.savefig(
         "../experiment_results/%s.png" % save_name, dpi=500, bbox_inches="tight"
     )
@@ -88,7 +87,6 @@ def plot_background_subplots(
     save_name: str = "plot_background_subplots",
     time: float = 7200,
 ):
-
     fig = plt.figure()
     fig.set_figheight(6)
     fig.set_figwidth(10)
@@ -103,11 +101,10 @@ def plot_background_subplots(
 
     ax3.loglog(bincenters, background_hist / time, "-", c=hex_list[0])
     ax4.plot(bincenters, signal_hist / time, "-", c=hex_list[0])
-    ax3.set_xlim([6,300])
-    ax4.set_xlim([6,300])
+    ax3.set_xlim([6, 300])
+    ax4.set_xlim([6, 300])
 
-    print(sum(signal_hist/time))
-
+    print(sum(signal_hist / time))
 
     max_counts = 0.01
 
@@ -122,11 +119,11 @@ def plot_background_subplots(
     xlabels[-2] = "%s+" % xlabels[-2]
     ax3.set_xticklabels(xlabels)
 
-    #ax4.text(
+    # ax4.text(
     #    np.average(bincenters) / 2,
     #    max_counts / 2,
     #    "%.3f counts/sec" % (np.sum(signal_hist) / (time)),
-    #)
+    # )
 
     ax3.set_ylim([0.0001, 0.01])
     ax4.set_ylim([0.0001, 0.01])
@@ -145,6 +142,7 @@ def plot_background_subplots(
     )
     plt.clf()
 
+
 def plot_alignment(
     resampled_data_list: NDArray[np.uint16] = None,
     deconvolved_images: NDArray[np.uint16] = None,
@@ -152,7 +150,7 @@ def plot_alignment(
     vmaxes: list = [100, 1e5],
     save_name: str = "plot_alignment",
 ):
-    hex_list = ["#023047","#219EBC","#FFB703","#FB8500","#F15025"]
+    hex_list = ["#023047", "#219EBC", "#FFB703", "#FB8500", "#F15025"]
     fig = plt.figure()
     fig.set_figheight(3)
     fig.set_figwidth(9)
@@ -161,30 +159,44 @@ def plot_alignment(
     ax2 = plt.subplot2grid(shape=(2, 6), loc=(1, 0), colspan=1, sharex=ax1, sharey=ax1)
     ax3 = plt.subplot2grid(shape=(2, 6), loc=(0, 1), colspan=1, sharex=ax1, sharey=ax1)
     ax4 = plt.subplot2grid(shape=(2, 6), loc=(1, 1), colspan=1, sharex=ax1, sharey=ax1)
-    ax5 = plt.subplot2grid(shape=(2, 6), loc=(0, 2), colspan=2, rowspan=2, sharex=ax1, sharey=ax1)
+    ax5 = plt.subplot2grid(
+        shape=(2, 6), loc=(0, 2), colspan=2, rowspan=2, sharex=ax1, sharey=ax1
+    )
     ax6 = plt.subplot2grid(shape=(2, 6), loc=(0, 4), colspan=2, rowspan=2)
 
     # plot the data
     vcount = 2
-    for (ax,resampled_data) in zip([ax1, ax2, ax3, ax4], resampled_data_list):
+    for ax, resampled_data in zip([ax1, ax2, ax3, ax4], resampled_data_list):
         image = ax.imshow(resampled_data, cmap=cmap, vmin=vmins[0], vmax=vmaxes[0])
-        ax.set_title('V%d' % vcount)
-        ax.hlines(np.arange(0,120,2), np.zeros(60), 120*np.ones(60),linewidth=0.1, color='w')
-        ax.vlines(np.arange(0,120,2), np.zeros(60), 120*np.ones(60),linewidth=0.1, color='w')
-        vcount+=1
-    
-    ax1.set_ylabel('pixel')
-    ax2.set_ylabel('pixel')
-    ax2.set_xlabel('pixel')
-    ax4.set_xlabel('pixel')
+        ax.set_title("V%d" % vcount)
+        ax.hlines(
+            np.arange(0, 120, 2),
+            np.zeros(60),
+            120 * np.ones(60),
+            linewidth=0.1,
+            color="w",
+        )
+        ax.vlines(
+            np.arange(0, 120, 2),
+            np.zeros(60),
+            120 * np.ones(60),
+            linewidth=0.1,
+            color="w",
+        )
+        vcount += 1
+
+    ax1.set_ylabel("pixel")
+    ax2.set_ylabel("pixel")
+    ax2.set_xlabel("pixel")
+    ax4.set_xlabel("pixel")
     ax1.get_xaxis().set_visible(False)
     ax3.get_xaxis().set_visible(False)
     ax3.get_yaxis().set_visible(False)
     ax4.get_yaxis().set_visible(False)
 
-    
     # get the other data
     import sys
+
     fpath = "../../detector_analysis"
     sys.path.insert(0, fpath)
     fpath = "../../coded_aperture_mask_designs"
@@ -192,6 +204,7 @@ def plot_alignment(
     from simulation_engine import SimulationEngine
     from hits import Hits
     from deconvolution import Deconvolution
+
     simulation_engine = SimulationEngine(construct="CA", source="PS", write_files=False)
 
     # timepix design
@@ -220,8 +233,8 @@ def plot_alignment(
     n_particles = 1.69e8
 
     # --------------set up simulation---------------
-    #for distance in distances:
-        #for si,(source_distance,n_particles) in enumerate(zip(source_distances, n_particles_list)):
+    # for distance in distances:
+    # for si,(source_distance,n_particles) in enumerate(zip(source_distances, n_particles_list)):
     print("RUNNING", n_particles, "PARTICLES")
     simulation_engine.set_config(
         det1_thickness_um=300,
@@ -272,37 +285,53 @@ def plot_alignment(
         plot_deconvolved_heatmap=False,
         plot_raw_heatmap=False,
         downsample=pixels_downsample,
-        trim=trim)
+        trim=trim,
+    )
 
     image = ax5.imshow(resampled_data.T, cmap=cmap, vmin=vmins[0], vmax=vmaxes[0])
-    ax5.hlines(np.arange(0,120,2), np.zeros(60), 120*np.ones(60),linewidth=0.1, color='w')
-    ax5.vlines(np.arange(0,120,2), np.zeros(60), 120*np.ones(60),linewidth=0.1, color='w')
-    ax5.set_title('simulated')
+    ax5.hlines(
+        np.arange(0, 120, 2), np.zeros(60), 120 * np.ones(60), linewidth=0.1, color="w"
+    )
+    ax5.vlines(
+        np.arange(0, 120, 2), np.zeros(60), 120 * np.ones(60), linewidth=0.1, color="w"
+    )
+    ax5.set_title("simulated")
 
     xlist = np.linspace(0, 120, 121)
     ylist = np.linspace(0, 120, 121)
     X, Y = np.meshgrid(xlist, ylist)
-    cp = ax6.contour(X, Y, deconvoled_image/ np.max(deconvoled_image), levels=[0.85,1],colors="#F15025")
+    cp = ax6.contour(
+        X,
+        Y,
+        deconvoled_image / np.max(deconvoled_image),
+        levels=[0.85, 1],
+        colors="#F15025",
+    )
 
-    
     import matplotlib.patches as mpatches
 
-    contour_colors = ["#0091AC","#D5573B", "#6F2DBD", "#9EF7F2"]
-    contour_colors = ["#023047","#FFB703","#219EBC","#FB8500"]
+    contour_colors = ["#0091AC", "#D5573B", "#6F2DBD", "#9EF7F2"]
+    contour_colors = ["#023047", "#FFB703", "#219EBC", "#FB8500"]
     versions = ["V2", "V3", "V4", "V5"]
     all_patches = []
-    all_patches.append(mpatches.Patch(color="#F15025", label='sim'))
+    all_patches.append(mpatches.Patch(color="#F15025", label="sim"))
     for i, cc in zip(range(4), contour_colors):
-        cp = ax6.contour(X, Y, deconvolved_images[i] / np.amax(deconvolved_images[i]),levels=[0.85,1],colors=cc)
+        cp = ax6.contour(
+            X,
+            Y,
+            deconvolved_images[i] / np.amax(deconvolved_images[i]),
+            levels=[0.85, 1],
+            colors=cc,
+        )
         mypatch = mpatches.Patch(color=cc, label=versions[i])
         all_patches.append(mypatch)
 
-    ax6.hlines(60, 0, 100,linewidth=0.1, color='grey', linestyles='--')
-    ax6.vlines(60, 0, 100,linewidth=0.1, color='grey', linestyles='--')
+    ax6.hlines(60, 0, 100, linewidth=0.1, color="grey", linestyles="--")
+    ax6.vlines(60, 0, 100, linewidth=0.1, color="grey", linestyles="--")
 
-    ax6.set_ylim([46,76])
-    ax6.set_xlim([46,76])
-    ax6.legend(handles=all_patches,loc='upper right')
+    ax6.set_ylim([46, 76])
+    ax6.set_xlim([46, 76])
+    ax6.legend(handles=all_patches, loc="upper right")
 
     # using padding
     fig.tight_layout()

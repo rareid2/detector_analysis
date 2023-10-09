@@ -1,3 +1,15 @@
+# go through angular space and see which pixel is lit up and how many surrpiunding (based on some threshold)
+# calculate the spread based on the pixel spread
+
+# trace each surrounding pixel to a pinhole to find angular spread of it
+# that IS the FWHM
+# find the pixel centers for each og the angles run
+# then
+
+# okay first load each image
+# trace each pixel that is over a threshold
+# what should threshold be? 4x of the noise floor?
+
 import sys
 
 sys.path.insert(1, "../detector_analysis")
@@ -6,10 +18,11 @@ from hits import Hits
 from scattering import Scattering
 from deconvolution import Deconvolution
 
+import matplotlib.pyplot as plt
+
 import numpy as np
 import os
 import copy
-import matplotlib.pyplot as plt
 
 # construct = CA and TD
 # source = DS and PS
@@ -57,13 +70,15 @@ flat_field = np.loadtxt(f"{txt_folder}interp_grid.txt")
 # before i run this, get point source strength
 # re run the plotting script
 
-theta_inds = [4, 5, 6, 7, 8, 20, 21, 22, 23, 24]
+signals = []
+uncertanties = []
+central_angles = []
+all_indices = []
 # ------------------- simulation parameters ------------------
 n_particles = 1e8
 ii = 0
-# for theta in [thetas[i] for i in theta_inds]:
-for theta in thetas[:1]:
-    print(theta)
+
+for theta in thetas[:29]:
     # --------------set up simulation---------------
     simulation_engine.set_config(
         det1_thickness_um=300,
@@ -103,10 +118,7 @@ for theta in thetas[:1]:
     # ---------- process results -----------
 
     myhits = Hits(fname=fname, experiment=False, txt_file=True)
-
-    # weight by cosine theta
-    # myhits.txt_hits = myhits.txt_hits * np.cos(np.deg2rad(theta))
-
+    """
     # myhits.get_det_hits(
     #    remove_secondaries=True, second_axis="y", energy_level=energy_level
     # )
@@ -125,76 +137,96 @@ for theta in thetas[:1]:
     else:
         hits_copy = copy.copy(myhits)
 
-    # try 0
-    myhits.txt_hits = np.zeros((122, 122))
-
     print(fname_tag)
 
     ii += 1
+    """
 
-# deconvolution steps
-deconvolver = Deconvolution(myhits, simulation_engine)
+    # deconvolution steps
+    deconvolver = Deconvolution(myhits, simulation_engine)
 
-# directory to save results in
-results_dir = "../simulation-results/rings/"
-results_tag = f"{fname_tag}-combined-{n_particles:.2E}_{energy_type}_{energy_level}"
-results_save = results_dir + results_tag
+    # directory to save results in
+    results_dir = "../simulation-results/rings/"
+    results_tag = f"{fname_tag}-{n_particles:.2E}_{energy_type}_{energy_level}"
+    results_save = results_dir + results_tag
 
-deconvolver.deconvolve(
-    downsample=int(multiplier * n_elements_original),
-    trim=trim,
-    vmax=None,
-    plot_deconvolved_heatmap=True,
-    plot_raw_heatmap=True,
-    save_raw_heatmap=results_save + "_raw.png",
-    save_deconvolve_heatmap=results_save + "_dc.png",
-    plot_signal_peak=False,
-    plot_conditions=False,
-    flat_field_array=None,
-    hits_txt=True,
-)
+    deconvolver.deconvolve(
+        downsample=int(multiplier * n_elements_original),
+        trim=trim,
+        vmax=None,
+        plot_deconvolved_heatmap=False,
+        plot_raw_heatmap=False,
+        flat_field_array=None,
+        hits_txt=True,
+    )
 
-signal = deconvolver.deconvolved_image
+    signal = deconvolver.deconvolved_image
 
-# read in the correct locations of everything
-indices = []
-with open("../simulation-results/rings/inds.txt", "r") as file:
-    sublist = []  # Initialize an empty sublist
-    for line in file:
-        line = line.strip()  # Remove leading/trailing whitespace
-        if line:  # Check if the line is not empty
-            x, y = map(int, line.split(","))  # Split the line and convert to integers
-            sublist.append((x, y))  # Add the tuple to the current sublist
-        else:
-            if sublist:
-                indices.append(sublist)  # Add the sublist to the main list if not empty
-            sublist = []  # Reset the sublist
+    noise_floor = np.average(deconvolver.deconvolved_image[:40, :40])
 
-# Add the last sublist if it exists
-if sublist:
-    indices.append(sublist)
+    # calculate angle of each pixel lol
+    pixel_size = pixel * 0.1  # cm
+    pixel_count = n_elements_original * multiplier
 
-# now, we go through each indices in the deconvolved image
+    # Initialize an empty list to store the coordinates
+    angles = []
+    center_pixel = 61
 
-# read in the angles as well
-angles = np.loadtxt("../simulation-results/rings/central-angles.txt")
-uncertanties = np.loadtxt("../simulation-results/rings/uncertainties.txt")
-
-signals = []
-for px_inds in indices:
     signal_sum = 0
-    for x, y in px_inds:
-        signal_sum += signal[x, y]
-    signals.append(signal_sum)
 
+    # max signal
+    max_value = np.max(signal)
+    max_indices = np.argwhere(signal == max_value)
+    max_indices = max_indices[0]
+
+    indices = []
+
+    for x in range(pixel_count):
+        for y in range(pixel_count):
+            # Calculate the relative position from the center
+            relative_x = (x - center_pixel) * pixel_size
+            relative_y = (y - center_pixel) * pixel_size
+
+            aa = np.sqrt(relative_x**2 + relative_y**2)
+
+            angle = np.arctan(aa / distance)
+
+            if signal[y, x] > noise_floor * 2:
+                angles.append(np.rad2deg(angle))
+                signal_sum += signal[y, x]
+                indices.append((y, x))
+                if y == max_indices[0] and x == max_indices[1]:
+                    central_angles.append(np.rad2deg(angle))
+                    print(np.rad2deg(angle))
+                    print(max_indices)
+
+    uncertanties.append((min(angles) - max(angles)) / 2)
+    signals.append(signal_sum / 89357784.00000003)
+    all_indices.append(indices)
+
+    ii += 1
 
 # Create the scatter plot
-plt.scatter(angles, signals, label="Data Points", marker="o", s=8)
+plt.scatter(central_angles, signals, label="Data Points", marker="o", s=8)
 
 # Plot x-axis uncertainty bars
-for x, x_err, y in zip(angles, uncertanties, signals):
+for x, x_err, y in zip(central_angles, uncertanties, signals):
     plt.plot([x - x_err, x + x_err], [y, y], color="blue")
-plt.ylim([0, 8e8])
-plt.savefig(
-    "../simulation-results/rings/pitch-angle-distribution-combined-sections.png"
-)
+
+plt.savefig("../simulation-results/rings/pitch-angle-distribution.png")
+
+np.savetxt("../simulation-results/rings/uncertainties.txt", np.array(uncertanties))
+np.savetxt("../simulation-results/rings/central-angles.txt", np.array(central_angles))
+
+with open("../simulation-results/rings/inds.txt", "w") as file:
+    for sublist in all_indices:
+        for x, y in sublist:
+            # Convert the tuple to a formatted string (e.g., "1,2")
+            line = f"{x},{y}\n"
+            file.write(line)
+        # Add a newline character after each sublist
+        file.write("\n")
+
+
+# TODO: should I use the central angle or the simulation angle
+# for now, use central angle
