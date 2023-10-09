@@ -19,14 +19,14 @@ def run_geom_corr(ind, direction, i, vmax=None):
 
     # general detector design
     det_size_cm = 3.05  # cm
-    pixel = 0.5  # mm
-    pixel_cm = 0.05
+    pixel = 0.25  # mm
+    pixel_cm = 0.025
 
     # ---------- coded aperture set up ---------
 
     # set number of elements
     n_elements_original = 61
-    multiplier = 1
+    multiplier = 2
 
     element_size = pixel * multiplier
     n_elements = (2 * n_elements_original) - 1
@@ -109,9 +109,7 @@ def run_geom_corr(ind, direction, i, vmax=None):
     energy_level = 100  # keV
 
     # --------------set up data naming---------------
-    fname_tag = (
-        f"{n_elements_original}-{distance}-{ind}-{direction}-geom-corr-{i}-ptsrc"
-    )
+    fname_tag = f"{n_elements_original}-{distance}-{ind}-{direction}-{i}"
     fname = f"../simulation-data/aperture-collimation/{fname_tag}_{n_particles:.2E}_{energy_type}_{energy_level}.csv"
 
     simulation_engine.set_macro(
@@ -126,7 +124,12 @@ def run_geom_corr(ind, direction, i, vmax=None):
     )
 
     # --------------RUN---------------
-    # simulation_engine.run_simulation(fname, build=False, rename=True)
+    if i < 5:
+        pass
+    elif direction == "0":
+        pass
+    else:
+        simulation_engine.run_simulation(fname, build=False, rename=True)
 
     # ---------- process results -----------
 
@@ -139,12 +142,12 @@ def run_geom_corr(ind, direction, i, vmax=None):
     deconvolver = Deconvolution(myhits, simulation_engine)
 
     # directory to save results in
-    results_dir = "../simulation-results/aperture-collimation/geom-correction/"
+    results_dir = "../simulation-results/aperture-collimation/61-2-400-d3-2p25/"
     results_tag = f"{fname_tag}_{n_particles:.2E}_{energy_type}_{energy_level}"
     results_save = results_dir + results_tag
 
     deconvolver.deconvolve(
-        downsample=n_elements_original,
+        downsample=int(multiplier * n_elements_original),
         trim=trim,
         vmax=vmax,
         plot_deconvolved_heatmap=True,
@@ -155,6 +158,8 @@ def run_geom_corr(ind, direction, i, vmax=None):
         plot_conditions=False,
     )
 
+    fwhm = deconvolver.calculate_fwhm()
+
     # return len(myhits.hits_dict["Position"])
     # Find the indices of the maximum value in the flattened array
     max_index_flat = np.argmax(deconvolver.deconvolved_image)
@@ -163,31 +168,23 @@ def run_geom_corr(ind, direction, i, vmax=None):
     max_index_2d = np.unravel_index(max_index_flat, deconvolver.deconvolved_image.shape)
 
     # Print the result
-    inds = (32 + 2 * ((ind / 2) - 1), 28 - 2 * ((ind / 2) - 1))
     print("Indices of the maximum value (2D):", max_index_2d)
+    noise = np.mean(deconvolver.deconvolved_image[5:50, 5:50])
 
-    if direction == "x":
-        print(max_index_2d, int(inds[1]), 30)
-        return deconvolver.deconvolved_image[int(inds[1]), 30]
-    elif direction == "y":
-        return deconvolver.deconvolved_image[30, int(inds[0])]
-    elif direction == "xy":
-        return deconvolver.deconvolved_image[int(inds[1]), int(inds[0])]
-    else:
-        return deconvolver.deconvolved_image[30, 30]
+    return deconvolver.deconvolved_image[max_index_2d] - noise, fwhm
 
 
 # setup
-data_folder = "/home/rileyannereid/workspace/geant4/simulation-results/aperture-collimation/geom-correction/"
-maxpixel = 30
-pix_int = 2
+data_folder = "/home/rileyannereid/workspace/geant4/simulation-results/aperture-collimation/61-2-400-d3-2p25/"
+maxpixel = 60
+pix_int = 4
 incs = range(pix_int, maxpixel + pix_int, pix_int)
-niter = 5
+niter = 20
 
 
 # RUN GEOMETRY NORMALIZATION ------------------ normalize total number of possible hits on detector
 # run center hits first
-
+"""
 avg_hits = 0
 for i in range(niter):
     nhits = run_geom_corr(0, "0", i)
@@ -221,17 +218,25 @@ for direction in ["x", "y", "xy"]:
     all_hits.append(total_hits)
 
 print(all_hits)
-
+"""
 # RUN SIGNAL NORMALIZATION ------------------ normalize total number of possible hits on detector
 # run center hits first
-
+"""
 avg_signal = 0
+fwhms = []
 for i in range(niter):
-    dec = run_geom_corr(0, "0", i)
-    print(dec)
+    dec, fwhm = run_geom_corr(0, "0", i)
     avg_signal += dec
+    fwhms.append(fwhm)
+    np.savetxt(
+        f"{data_folder}center-fwhm.txt",
+        np.array([fwhms]),
+        delimiter=", ",
+        fmt="%.14f",
+    )
 
 # save it
+
 sig_norm = avg_signal / niter
 np.savetxt(
     f"{data_folder}center-sig-norm.txt",
@@ -240,22 +245,103 @@ np.savetxt(
     fmt="%.14f",
 )
 
-# run each direction hits - no mask
+np.savetxt(
+    f"{data_folder}center-fwhm.txt",
+    np.array([fwhms]),
+    delimiter=", ",
+    fmt="%.14f",
+)
+
+# run each direction signal
 all_hits = []
 for direction in ["x", "y", "xy"]:
     total_hits = []
+    all_fwhms = []
     for inc in incs:
         avg_hits = 0
+        fwhms = []
         for i in range(niter):
-            nhits = run_geom_corr(inc, direction, i, vmax=sig_norm)
+            nhits, fwhm = run_geom_corr(inc, direction, i)
             avg_hits += nhits
-        total_hits.append((avg_hits / niter) / sig_norm)
+            fwhms.append(fwhm)
+        # total_hits.append((avg_hits / niter) / sig_norm)
+        all_fwhms.append(fwhms)
+        # np.savetxt(
+        #    f"{data_folder}{direction}-sig.txt",
+        #    np.array(total_hits),
+        #    delimiter=", ",
+        #    fmt="%.14f",
+        # )
+        np.savetxt(
+            f"{data_folder}{direction}-fwhm.txt",
+            np.array(all_fwhms),
+            delimiter=", ",
+            fmt="%.14f",
+        )
     np.savetxt(
-        f"{data_folder}{direction}-sig.txt",
-        np.array(total_hits),
+        f"{data_folder}{direction}-fwhm.txt",
+        np.array(all_fwhms),
         delimiter=", ",
         fmt="%.14f",
     )
-    all_hits.append(total_hits)
+    # all_hits.append(total_hits)
 
-print(all_hits)
+# print(all_hits)
+
+
+# Define the input and output file paths
+for direction in ["x", "y", "xy"]:
+    input_file_path = f"{data_folder}{direction}-fwhm.txt"
+    output_file_path = f"{data_folder}{direction}-average-fwhm.txt"
+
+    # Read the input file
+    with open(input_file_path, "r") as input_file:
+        lines = input_file.readlines()
+
+    # Initialize an empty list to store the averages
+    averages = []
+
+    # Process each row in the input data
+    for line in lines:
+        # Split the line into a list of numbers, assuming they are separated by commas
+        numbers = [float(x) for x in line.strip().split(",")]
+
+        # Calculate the average of the numbers in the row
+        row_average = sum(numbers) / len(numbers)
+
+        # Append the average to the list
+        averages.append(row_average)
+
+    # Save the averages to the output file
+    with open(output_file_path, "w") as output_file:
+        for average in averages:
+            output_file.write(f"{average:.14f}\n")
+
+    print(f"Averages saved to {output_file_path}")
+"""
+
+directions = ["x", "y", "xy"]
+for direction in directions:
+    file_path = f"{data_folder}{direction}-average-fwhm.txt"  # Change this to the path of your data file
+    data = np.loadtxt(file_path)
+
+    import numpy as np
+    from scipy.interpolate import CubicSpline
+
+    # 2. Fit a cubic spline curve to the data
+    x = np.arange(len(data))  # Generate x values as integers from 0 to N-1
+    coefficients = np.polyfit(x, data, 2)  # Fit a first-degree (linear) polynomial
+    print(coefficients)
+    # The coefficients now contain the slope and intercept of the fitted line.
+    a, b, c = coefficients
+    print(f"The quadratic polynomial coefficients are: a={a}, b={b}, c={c}")
+
+    # You can create a polynomial function using these coefficients:
+    poly_func = np.poly1d(coefficients)
+    calculated_values = poly_func(x)
+
+    # 4. Save the calculated values to a new text file
+    output_file_path = f"{data_folder}{direction}-fwhm-calc.txt"  # Change this to your desired output file path
+    np.savetxt(output_file_path, calculated_values, fmt="%.6f", delimiter="\n")
+
+    print(f"Calculated values saved to {output_file_path}")

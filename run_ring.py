@@ -12,15 +12,19 @@ import os
 
 simulation_engine = SimulationEngine(construct="CA", source="PS", write_files=True)
 
+# flat field array
+# txt_folder = "/home/rileyannereid/workspace/geant4/simulation-results/aperture-collimation/61-2-400-d3-2p25/"
+# flat_field = np.loadtxt(f"{txt_folder}interp_grid.txt")
+flat_field = None
 # general detector design
 det_size_cm = 3.05  # cm
-pixel = 0.5  # mm
+pixel = 0.25  # mm
 
 # ---------- coded aperture set up ---------
 
 # set number of elements
 n_elements_original = 61
-multiplier = 1
+multiplier = int(0.5 / pixel)
 
 element_size = pixel * multiplier
 n_elements = (2 * n_elements_original) - 1
@@ -40,15 +44,20 @@ fake_radius = 1
 
 start = 0
 end = 47
-step = 1
+step = 1.43 / 2
 
 # Create the list using a list comprehension
 thetas = [start + i * step for i in range(int((end - start) / step) + 1)]
 
 # ------------------- simulation parameters ------------------
-n_particles = 1e7
+for theta in [thetas[14]]:
+    n_particles = 1e8
 
-for theta in thetas:
+    # if 10 <= theta < 30:
+    #    pass
+    # else:
+    #    continue
+
     # --------------set up simulation---------------
     simulation_engine.set_config(
         det1_thickness_um=300,
@@ -81,11 +90,11 @@ for theta in thetas:
         fname_tag=fname_tag,
         confine=False,
         detector_dim=det_size_cm,
-        dist=theta,
+        theta=theta,
     )
 
     # --------------RUN---------------
-    simulation_engine.run_simulation(fname, build=False, rename=True)
+    # simulation_engine.run_simulation(fname, build=False, rename=True)
 
     # ---------- process results -----------
 
@@ -103,7 +112,7 @@ for theta in thetas:
     results_save = results_dir + results_tag
 
     deconvolver.deconvolve(
-        downsample=n_elements_original,
+        downsample=int(multiplier * n_elements_original),
         trim=trim,
         vmax=None,
         plot_deconvolved_heatmap=True,
@@ -112,4 +121,5 @@ for theta in thetas:
         save_deconvolve_heatmap=results_save + "_dc.png",
         plot_signal_peak=False,
         plot_conditions=False,
+        flat_field_array=flat_field,
     )
