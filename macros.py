@@ -256,8 +256,8 @@ def write_surface_macro(
         f.write("/gps/particle e- \n")
         f.write("/gps/pos/type Plane \n")
         f.write("/gps/pos/shape Square \n")
-        f.write("/gps/pos/halfx 2.25 cm \n")
-        f.write("/gps/pos/halfy 2.25 cm \n")
+        f.write("/gps/pos/halfx 5.3 cm \n")
+        f.write("/gps/pos/halfy 5.3 cm \n")
 
         # f.write(f"/gps/pos/radius {radius_cm} cm \n")
 

@@ -13,9 +13,10 @@ import os
 simulation_engine = SimulationEngine(construct="CA", source="PS", write_files=True)
 
 # flat field array
-# txt_folder = "/home/rileyannereid/workspace/geant4/simulation-results/aperture-collimation/61-2-400-d3-2p25/"
-# flat_field = np.loadtxt(f"{txt_folder}interp_grid.txt")
+txt_folder = "/home/rileyannereid/workspace/geant4/simulation-results/aperture-collimation/61-2-400/"
+flat_field = np.loadtxt(f"{txt_folder}interp_grid.txt")
 flat_field = None
+
 # general detector design
 det_size_cm = 3.05  # cm
 pixel = 0.25  # mm
@@ -40,24 +41,17 @@ thickness = 400  # um
 # focal length
 distance = 2  # cm
 
-fake_radius = 1
-
+# set theta loop
 start = 0
 end = 47
 step = 1.43 / 2
-
-# Create the list using a list comprehension
 thetas = [start + i * step for i in range(int((end - start) / step) + 1)]
 
+n_particles = 1e7
+    
 # ------------------- simulation parameters ------------------
-for theta in [thetas[14]]:
-    n_particles = 1e8
-
-    # if 10 <= theta < 30:
-    #    pass
-    # else:
-    #    continue
-
+for theta in [thetas[45]]:
+    
     # --------------set up simulation---------------
     simulation_engine.set_config(
         det1_thickness_um=300,
@@ -70,7 +64,7 @@ for theta in [thetas[14]]:
         element_size_mm=element_size,
         mosaic=mosaic,
         mask_size=mask_size,
-        radius_cm=fake_radius,
+        radius_cm=1,
     )
 
     # --------------set up source---------------
@@ -79,7 +73,7 @@ for theta in [thetas[14]]:
 
     # --------------set up data naming---------------
     formatted_theta = "{:.0f}p{:02d}".format(int(theta), int((theta % 1) * 100))
-    fname_tag = f"{n_elements_original}-{distance}-{formatted_theta}-deg-d3-2p25"
+    fname_tag = f"{n_elements_original}-{distance}-{formatted_theta}-deg-d3-5p3"
     fname = f"../simulation-data/rings/{fname_tag}_{n_particles:.2E}_{energy_type}_{energy_level}_{formatted_theta}.csv"
 
     simulation_engine.set_macro(
@@ -94,7 +88,7 @@ for theta in [thetas[14]]:
     )
 
     # --------------RUN---------------
-    # simulation_engine.run_simulation(fname, build=False, rename=True)
+    simulation_engine.run_simulation(fname, build=False, rename=True)
 
     # ---------- process results -----------
 
