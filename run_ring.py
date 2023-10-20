@@ -47,11 +47,10 @@ end = 47
 step = 1.43 / 2
 thetas = [start + i * step for i in range(int((end - start) / step) + 1)]
 
-n_particles = 1e7
-    
+n_particles = 5e8
+
 # ------------------- simulation parameters ------------------
-for theta in [thetas[45]]:
-    
+for theta in thetas:
     # --------------set up simulation---------------
     simulation_engine.set_config(
         det1_thickness_um=300,
@@ -73,7 +72,7 @@ for theta in [thetas[45]]:
 
     # --------------set up data naming---------------
     formatted_theta = "{:.0f}p{:02d}".format(int(theta), int((theta % 1) * 100))
-    fname_tag = f"{n_elements_original}-{distance}-{formatted_theta}-deg-d3-5p3"
+    fname_tag = f"{n_elements_original}-{distance}-{formatted_theta}-deg-d2-4p5"
     fname = f"../simulation-data/rings/{fname_tag}_{n_particles:.2E}_{energy_type}_{energy_level}_{formatted_theta}.csv"
 
     simulation_engine.set_macro(

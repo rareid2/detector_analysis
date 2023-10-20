@@ -18,7 +18,7 @@ simulation_engine = SimulationEngine(construct="CA", source="PS", write_files=Fa
 
 # general detector design
 det_size_cm = 3.05  # cm
-pixel = 0.25  # mm
+pixel = 0.5  # mm
 
 start = 0
 end = 47
@@ -32,7 +32,7 @@ thetas = [start + i * step for i in range(int((end - start) / step) + 1)]
 
 # set number of elements
 n_elements_original = 61
-multiplier = 2
+multiplier = 1
 
 element_size = pixel * multiplier
 n_elements = (2 * n_elements_original) - 1
@@ -51,18 +51,13 @@ distance = 2  # cm
 fake_radius = 1
 
 # flat field array
-txt_folder = "/home/rileyannereid/workspace/geant4/simulation-results/aperture-collimation/61-2-400-d3-2p25/"
+txt_folder = "/home/rileyannereid/workspace/geant4/simulation-results/aperture-collimation/61-2-400/"
 flat_field = np.loadtxt(f"{txt_folder}interp_grid.txt")
 
-# before i run this, get point source strength
-# re run the plotting script
-
-theta_inds = [4, 5, 6, 7, 8, 20, 21, 22, 23, 24]
 # ------------------- simulation parameters ------------------
 n_particles = 1e8
 ii = 0
-# for theta in [thetas[i] for i in theta_inds]:
-for theta in thetas[:1]:
+for theta in thetas:
     print(theta)
     # --------------set up simulation---------------
     simulation_engine.set_config(
@@ -85,7 +80,7 @@ for theta in thetas[:1]:
 
     # --------------set up data naming---------------
     formatted_theta = "{:.0f}p{:02d}".format(int(theta), int((theta % 1) * 100))
-    fname_tag = f"{n_elements_original}-{distance}-{formatted_theta}-deg-d3-2p25"
+    fname_tag = f"{n_elements_original}-{distance}-{formatted_theta}-deg-d3-5p3"
     # fname = f"../simulation-data/rings/{fname_tag}_{n_particles:.2E}_{energy_type}_{energy_level}_{formatted_theta}.csv"
     fname = f"../simulation-results/rings/{fname_tag}_{n_particles:.2E}_{energy_type}_{energy_level}_raw.txt"
 
@@ -125,9 +120,6 @@ for theta in thetas[:1]:
     else:
         hits_copy = copy.copy(myhits)
 
-    # try 0
-    myhits.txt_hits = np.zeros((122, 122))
-
     print(fname_tag)
 
     ii += 1
@@ -137,7 +129,7 @@ deconvolver = Deconvolution(myhits, simulation_engine)
 
 # directory to save results in
 results_dir = "../simulation-results/rings/"
-results_tag = f"{fname_tag}-combined-{n_particles:.2E}_{energy_type}_{energy_level}"
+results_tag = f"combined-{n_particles:.2E}_{energy_type}_{energy_level}"
 results_save = results_dir + results_tag
 
 deconvolver.deconvolve(
@@ -154,6 +146,9 @@ deconvolver.deconvolve(
     hits_txt=True,
 )
 
+"""
+mx, my = deconvolver.reverse_raytrace()
+deconvolver.export_to_matlab(np.column_stack((mx, my)))
 signal = deconvolver.deconvolved_image
 
 # read in the correct locations of everything
@@ -185,16 +180,15 @@ for px_inds in indices:
     signal_sum = 0
     for x, y in px_inds:
         signal_sum += signal[x, y]
-    signals.append(signal_sum)
+    signals.append(signal_sum / len(px_inds))
 
 
 # Create the scatter plot
-plt.scatter(angles, signals, label="Data Points", marker="o", s=8)
+# plt.scatter(angles, signals, label="Data Points", marker="o", s=8)
 
 # Plot x-axis uncertainty bars
-for x, x_err, y in zip(angles, uncertanties, signals):
-    plt.plot([x - x_err, x + x_err], [y, y], color="blue")
-plt.ylim([0, 8e8])
-plt.savefig(
-    "../simulation-results/rings/pitch-angle-distribution-combined-sections.png"
-)
+# for x, x_err, y in zip(angles, uncertanties, signals):
+#    plt.plot([x - x_err, x + x_err], [y, y], color="blue")
+# plt.ylim([0, 3e6])
+# plt.savefig("../simulation-results/rings/pitch-angle-distribution-combined-section.png")
+"""

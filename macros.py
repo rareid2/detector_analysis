@@ -256,8 +256,8 @@ def write_surface_macro(
         f.write("/gps/particle e- \n")
         f.write("/gps/pos/type Plane \n")
         f.write("/gps/pos/shape Square \n")
-        f.write("/gps/pos/halfx 5.3 cm \n")
-        f.write("/gps/pos/halfy 5.3 cm \n")
+        f.write("/gps/pos/halfx 4.525 cm \n")
+        f.write("/gps/pos/halfy 4.525 cm \n")
 
         # f.write(f"/gps/pos/radius {radius_cm} cm \n")
 
@@ -265,7 +265,7 @@ def write_surface_macro(
         # 499.935 is the front face of detector 1
         # f.write(f"/gps/pos/centre 0 {ca_pos} {world_offset} cm \n")  # - for y align
         # pos = [0, ca_pos, world_offset]
-        f.write(f"/gps/pos/centre 0 0 {ca_pos-0.965} cm \n")
+        f.write(f"/gps/pos/centre 0 0 {ca_pos-2} cm \n")
         pos = [0, 0, ca_pos]
 
         # write the confinement to the volume

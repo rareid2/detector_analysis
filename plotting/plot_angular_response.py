@@ -1,15 +1,3 @@
-# go through angular space and see which pixel is lit up and how many surrpiunding (based on some threshold)
-# calculate the spread based on the pixel spread
-
-# trace each surrounding pixel to a pinhole to find angular spread of it
-# that IS the FWHM
-# find the pixel centers for each og the angles run
-# then
-
-# okay first load each image
-# trace each pixel that is over a threshold
-# what should threshold be? 4x of the noise floor?
-
 import sys
 
 sys.path.insert(1, "../detector_analysis")
@@ -64,7 +52,7 @@ distance = 2  # cm
 fake_radius = 1
 
 # flat field array
-txt_folder = "/home/rileyannereid/workspace/geant4/simulation-results/aperture-collimation/61-2-400-d3-2p25/"
+txt_folder = "/home/rileyannereid/workspace/geant4/simulation-results/aperture-collimation/61-2-400/"
 flat_field = np.loadtxt(f"{txt_folder}interp_grid.txt")
 
 # before i run this, get point source strength
@@ -78,7 +66,7 @@ all_indices = []
 n_particles = 1e8
 ii = 0
 
-for theta in thetas[:29]:
+for theta in thetas:
     # --------------set up simulation---------------
     simulation_engine.set_config(
         det1_thickness_um=300,
@@ -100,7 +88,7 @@ for theta in thetas[:29]:
 
     # --------------set up data naming---------------
     formatted_theta = "{:.0f}p{:02d}".format(int(theta), int((theta % 1) * 100))
-    fname_tag = f"{n_elements_original}-{distance}-{formatted_theta}-deg-d3-2p25"
+    fname_tag = f"{n_elements_original}-{distance}-{formatted_theta}-deg-d3-5p3"
     # fname = f"../simulation-data/rings/{fname_tag}_{n_particles:.2E}_{energy_type}_{energy_level}_{formatted_theta}.csv"
     fname = f"../simulation-results/rings/{fname_tag}_{n_particles:.2E}_{energy_type}_{energy_level}_raw.txt"
 
@@ -119,20 +107,10 @@ for theta in thetas[:29]:
 
     myhits = Hits(fname=fname, experiment=False, txt_file=True)
     """
-    # myhits.get_det_hits(
-    #    remove_secondaries=True, second_axis="y", energy_level=energy_level
-    # )
-    # myhits.exclude_pcfov(det_size_cm, mask_size / 10, distance, 3, "y")
-
+    # for combined
     # check if not first iteration
     if ii != 0:
-        # update fields in hits dict
-        # myhits.hits_dict["Position"].extend(hits_copy.hits_dict["Position"])
-        # myhits.hits_dict["Energy"].extend(hits_copy.hits_dict["Energy"])
-        # myhits.hits_dict["Vertices"].extend(hits_copy.hits_dict["Vertices"])
-
         myhits.txt_hits += hits_copy.txt_hits
-
         hits_copy = copy.copy(myhits)
     else:
         hits_copy = copy.copy(myhits)
@@ -197,11 +175,11 @@ for theta in thetas[:29]:
                 indices.append((y, x))
                 if y == max_indices[0] and x == max_indices[1]:
                     central_angles.append(np.rad2deg(angle))
-                    print(np.rad2deg(angle))
-                    print(max_indices)
+                    # print(np.rad2deg(angle))
+                    # print(max_indices)
 
     uncertanties.append((min(angles) - max(angles)) / 2)
-    signals.append(signal_sum / 89357784.00000003)
+    signals.append(signal_sum / 23284156.432142716)
     all_indices.append(indices)
 
     ii += 1
@@ -230,3 +208,8 @@ with open("../simulation-results/rings/inds.txt", "w") as file:
 
 # TODO: should I use the central angle or the simulation angle
 # for now, use central angle
+
+
+# could have tiers of thresholds - highest (max
+# if pixel is more than a few pixels away from a high tier pixel, likely an error
+# pull up a plot to confirm this

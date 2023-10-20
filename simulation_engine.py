@@ -73,6 +73,7 @@ class SimulationEngine:
         self.mask_thickness_um = mask_thickness_um
         self.mask_gap_cm = mask_gap_cm
         self.element_size_mm = element_size_mm
+        self.mosaic = mosaic
         if mosaic:
             # find number in original pattern
             rr = int((n_elements + 1) / 2)

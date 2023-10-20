@@ -15,6 +15,8 @@ import sys
 sys.path.insert(1, "../coded_aperture_mask_designs")
 from util_fncs import makeMURA, make_mosaic_MURA, get_decoder_MURA
 
+from scipy.io import savemat
+
 
 class Deconvolution:
     def __init__(
@@ -33,6 +35,8 @@ class Deconvolution:
             self.pixel_size = 0.0055  # cm # keep constant for timepix detector
             self.experiment = False  # TODO fix this, temporary
             self.hits_data = hits.txt_hits
+
+            self.simulation_engine = simulation_engine
         else:
             self.experiment = True
             self.raw_heatmap = experiment_data
@@ -161,7 +165,7 @@ class Deconvolution:
 
         return
 
-    def get_mask(self) -> NDArray[np.uint16]:
+    def get_mask(self, mosaic: bool = True) -> NDArray[np.uint16]:
         """
         get MURA mask design as a 2d array
 
@@ -171,9 +175,21 @@ class Deconvolution:
         """
 
         # get mask design as an array of 0s and 1s
-        mask, _ = make_mosaic_MURA(
-            self.mura_elements, self.element_size_mm, holes=False, generate_files=False
-        )
+        if mosaic:
+            mask, _ = make_mosaic_MURA(
+                self.mura_elements,
+                self.element_size_mm,
+                holes=False,
+                generate_files=False,
+            )
+        else:
+            mask, dd = makeMURA(
+                self.mura_elements,
+                self.element_size_mm,
+                holes_inv=False,
+                generate_files=False,
+            )
+            self.dd = dd
         self.mask = mask
 
         return mask
@@ -222,6 +238,7 @@ class Deconvolution:
 
         # scipy.ndimage.zoom used here
         resizedIm = zoom(self.rawIm, len(self.decoder) / len(self.rawIm))
+        print(np.shape(self.rawIm))
 
         # Fourier space multiplication
         Image = np.real(
@@ -445,14 +462,14 @@ class Deconvolution:
             if apply_distribution:
                 self.apply_dist(dist_type)
         elif hits_txt:
-            self.raw_heatmap = self.hits_data
+            self.raw_heatmap = zoom(self.hits_data, 0.5)
         if plot_raw_heatmap:
             self.plot_heatmap(self.raw_heatmap, save_name=save_raw_heatmap, vmax=vmax)
 
         np.savetxt(f"{save_raw_heatmap[:-3]}txt", self.raw_heatmap)
 
         # get mask and decoder
-        self.get_mask()
+        self.get_mask(self.simulation_engine.mosaic)
         self.get_decoder()
 
         # flip the heatmap over both axes bc point hole
@@ -571,6 +588,127 @@ class Deconvolution:
         px = data[data >= half_max]
 
         return len(px) + 1
+
+    def reverse_raytrace(self):
+        # attempt to reverse ray trace each pixel through each coded aperture hole
+        # generate statistical map of hits
+
+        # need locations of each coded apeture hole
+        cell_size_cm = 0.05
+        px_size_cm = 0.025
+        focal_length = 2  # cm
+        src_plane = 3  # cm
+
+        mask_center = 30
+        # detector_center = 30
+        detector_center = 60.5
+
+        # raw_hits = zoom(self.raw_heatmap, 0.5)
+        raw_hits = self.raw_heatmap
+
+        # mask is centered at 0,0, focal length
+        mask_coordinates = []
+        mask = self.get_mask(mosaic=False)
+        for row_idx, row in enumerate(mask):
+            for col_idx, value in enumerate(row):
+                if value == 0:
+                    x = (col_idx - mask_center) * cell_size_cm
+                    y = (row_idx - mask_center) * cell_size_cm
+                    mask_coordinates.append((x, y))
+
+        # detector is centered at 0,0,0 - where 0,0 is the corner of the center 4 pixels
+        px_coordinates = []
+        for row_idx, row in enumerate(raw_hits):
+            for col_idx, value in enumerate(row):
+                x = (col_idx - detector_center) * px_size_cm
+                y = (row_idx - detector_center) * px_size_cm
+                px_coordinates.append((x, y))
+
+        # lol so this whole thing actually simplifies to
+        t = src_plane / focal_length
+
+        # use t to find the point on the source plane LOL
+        # new_x = px[0] + (mx[0] - px[0]) * t
+        # new_y = px[1] + (mx[1] - px[1]) * t
+        # new_z = src_plane
+
+        # build the matrix
+        mx = [arr[0] for arr in mask_coordinates]
+        mx = np.vstack(mx)
+
+        my = [arr[1] for arr in mask_coordinates]
+        my = np.vstack(my)
+
+        xes = []
+        yes = []
+        existing_histogram = np.zeros((122, 122))
+        x_edges = np.linspace(-2.75, 2.75, 122 + 1)
+        y_edges = np.linspace(-2.75, 2.75, 122 + 1)
+
+        for ii, pxy in enumerate(px_coordinates):
+            new_x = pxy[0] * (1 - t) + t * mx
+            new_y = pxy[1] * (1 - t) + t * my
+            new_z = src_plane
+
+            # invert to get hits
+            col_idx = int(pxy[0] / px_size_cm)
+            row_idx = int(pxy[1] / px_size_cm)
+
+            px_hits = raw_hits[row_idx, col_idx]
+
+            histogram, _, _ = np.histogram2d(
+                new_x.flatten(), new_y.flatten(), bins=[x_edges, y_edges]
+            )
+
+            if px_hits > 0:
+                existing_histogram += histogram * int(px_hits)
+            else:
+                pass
+
+        plt.clf()
+        plt.imshow(existing_histogram)
+        plt.savefig("test.png")
+        return mx, my
+
+    def export_to_matlab(self, openelements):
+        # Define a dictionary to store the grid
+        no_mosaic_mask = self.get_mask(False)
+        no_mosaic_decoder = self.dd
+        data = {"mask": no_mosaic_mask}
+
+        # Specify the file path where you want to save the .mat file
+        file_path = "mask.mat"
+
+        # Save the grid data as a .mat file
+        savemat(file_path, data)
+
+        # save resampled hits as well
+
+        data = {"hits": self.raw_heatmap}
+
+        # Specify the file path where you want to save the .mat file
+        file_path = "hits.mat"
+
+        # Save the grid data as a .mat file
+        savemat(file_path, data)
+
+        data = {"decoder": no_mosaic_decoder}
+
+        # Specify the file path where you want to save the .mat file
+        file_path = "decoder.mat"
+
+        # Save the grid data as a .mat file
+        savemat(file_path, data)
+
+        data = {"openElements": openelements}
+
+        # Specify the file path where you want to save the .mat file
+        file_path = "open_elements.mat"
+
+        # Save the grid data as a .mat file
+        savemat(file_path, data)
+
+        return
 
     """ # TODO! move these to a new script 
     def plot_flux_signal(self, ax, simulation_engine, fname):
