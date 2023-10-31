@@ -11,11 +11,10 @@ import os
 # construct = CA and TD
 # source = DS and PS
 
-# need to run for each indices in each direction, 3 times
 
+def run_geom_corr(ind, direction, i, results_folder, vmax=None, simulate=False, txt=True, hitsonly=False, scale=None):
 
-def run_geom_corr(ind, direction, i, vmax=None):
-    simulation_engine = SimulationEngine(construct="CA", source="PS", write_files=True)
+    simulation_engine = SimulationEngine(construct="CA", source="PS", write_files=False)
 
     # general detector design
     det_size_cm = 3.05  # cm
@@ -109,8 +108,15 @@ def run_geom_corr(ind, direction, i, vmax=None):
     energy_level = 100  # keV
 
     # --------------set up data naming---------------
-    fname_tag = f"{n_elements_original}-{distance}-{ind}-{direction}-{i}"
-    fname = f"../simulation-data/aperture-collimation/{fname_tag}_{n_particles:.2E}_{energy_type}_{energy_level}.csv"
+    if hitsonly:
+        fname_tag = f"hitsonly-{n_elements_original}-{distance}-{ind}-{direction}-{i}_{n_particles:.2E}_{energy_type}_{energy_level}"
+    else:
+        fname_tag = f"{n_elements_original}-{distance}-{ind}-{direction}-{i}_{n_particles:.2E}_{energy_type}_{energy_level}"
+    
+    if txt:
+        fname = f"{results_folder}{fname_tag}_raw.txt"
+    else:
+        fname = f"{results_folder}{fname_tag}.csv"
 
     simulation_engine.set_macro(
         n_particles=int(n_particles),
@@ -123,225 +129,191 @@ def run_geom_corr(ind, direction, i, vmax=None):
         detector_dim=det_size_cm,
     )
 
-    # --------------RUN---------------
-    if i < 5:
-        pass
-    elif direction == "0":
-        pass
-    else:
-        simulation_engine.run_simulation(fname, build=False, rename=True)
-
-    # ---------- process results -----------
-
-    myhits = Hits(fname=fname, experiment=False)
-    myhits.get_det_hits(
-        remove_secondaries=True, second_axis="y", energy_level=energy_level
-    )
-    # print(len(myhits.hits_dict["Position"]))
-    # deconvolution steps
-    deconvolver = Deconvolution(myhits, simulation_engine)
-
+    # --------------RUN AND PROCESS---------------
     # directory to save results in
-    results_dir = "../simulation-results/aperture-collimation/61-2-400-d3-2p25/"
-    results_tag = f"{fname_tag}_{n_particles:.2E}_{energy_type}_{energy_level}"
-    results_save = results_dir + results_tag
+    results_save = f"{results_folder}{fname_tag}"
 
-    deconvolver.deconvolve(
-        downsample=int(multiplier * n_elements_original),
-        trim=trim,
-        vmax=vmax,
-        plot_deconvolved_heatmap=True,
-        plot_raw_heatmap=True,
-        save_raw_heatmap=results_save + "_raw.png",
-        save_deconvolve_heatmap=results_save + "_dc.png",
-        plot_signal_peak=False,
-        plot_conditions=False,
-    )
+    if simulate and not hitsonly:
+        simulation_engine.run_simulation(fname, build=True, rename=True)
 
-    fwhm = deconvolver.calculate_fwhm()
+        # get the raw hits
+        myhits = Hits(fname=fname, experiment=False)
+        myhits.get_det_hits(
+            remove_secondaries=True, second_axis="y", energy_level=energy_level
+        )
+        hits_len = len(myhits.hits_dict["Position"])
 
-    # return len(myhits.hits_dict["Position"])
-    # Find the indices of the maximum value in the flattened array
-    max_index_flat = np.argmax(deconvolver.deconvolved_image)
+        # process them (txt file will be saved)
+        deconvolver = Deconvolution(myhits, simulation_engine)
+        deconvolver.deconvolve(
+            downsample=int(multiplier * n_elements_original),
+            trim=trim,
+            vmax=vmax,
+            plot_deconvolved_heatmap=True,
+            plot_raw_heatmap=True,
+            save_raw_heatmap=results_save + "_raw.png",
+            save_deconvolve_heatmap=results_save + "_dc.png",
+            plot_signal_peak=False,
+            plot_conditions=False,
+            hits_txt=False
+        )
+    elif txt and not hitsonly:
+        # dont simulate, process the txt file
+        myhits = Hits(fname=fname, experiment=False, txt_file=True)
+        hits_len = np.sum(np.loadtxt(fname))
 
-    # Convert the flattened index to 2D indices
-    max_index_2d = np.unravel_index(max_index_flat, deconvolver.deconvolved_image.shape)
+        # process them
+        deconvolver = Deconvolution(myhits, simulation_engine)
+        deconvolver.deconvolve(
+            downsample=int(multiplier * n_elements_original),
+            trim=trim,
+            vmax=vmax,
+            plot_deconvolved_heatmap=True,
+            plot_raw_heatmap=True,
+            save_raw_heatmap=results_save + "_raw.png",
+            save_deconvolve_heatmap=results_save + "_dc.png",
+            plot_signal_peak=False,
+            plot_conditions=False,
+            hits_txt=True
+        )
+    else:
+        # dont process anything, only getting raw hits
+        if txt:
+            myhits = Hits(fname=fname, experiment=False, txt_file=True)
+            hits_len = np.sum(np.loadtxt(fname))
+        else:
+            myhits = Hits(fname=fname, experiment=False)
+            myhits.get_det_hits(
+                remove_secondaries=True, second_axis="y", energy_level=energy_level)
+            hits_len = len(myhits.hits_dict["Position"])
 
-    # Print the result
-    print("Indices of the maximum value (2D):", max_index_2d)
-    noise = np.mean(deconvolver.deconvolved_image[5:50, 5:50])
+    if not hitsonly:
+        # find the max index
+        max_index_flat = np.argmax(deconvolver.deconvolved_image)
+        max_index_2d = np.unravel_index(max_index_flat, deconvolver.deconvolved_image.shape)
 
-    return deconvolver.deconvolved_image[max_index_2d] - noise, fwhm
+        # shift up to the noise floor so that the noise floor is at 0
+        deconvolver.shift_noise_floor_ptsrc(max_index_2d[0], max_index_2d[1])
+        max_signal = deconvolver.shifted_image[max_index_2d]
+        
+        if scale is None:
+            scale = max_signal
+        fwhm = deconvolver.calculate_fwhm(direction, max_index_2d, scale = scale)
+        
+        #print("Indices of the maximum value (2D):", max_index_2d)
+        
+    else:
+        max_signal = None
+        fwhm = None
+
+    return max_signal, fwhm, hits_len
 
 
-# setup
-data_folder = "/home/rileyannereid/workspace/geant4/simulation-results/aperture-collimation/61-2-400-d3-2p25/"
+# -------- ------- SETUP -------- ------- 
+results_folder = "/Users/rileyannereid/Code/detector_analysis/results/61-2-400/"
 maxpixel = 60
 pix_int = 4
 incs = range(pix_int, maxpixel + pix_int, pix_int)
 niter = 20
 
+# -------- -------STEP 1 : need to get the raw hits (shielding stays, but no mask) -------- -------
+# need to comment out the physical mask vols in detector construction
+step1 = True
+simulate = False
+txt = False
+hitsonly = True
 
-# RUN GEOMETRY NORMALIZATION ------------------ normalize total number of possible hits on detector
-# run center hits first
-"""
-avg_hits = 0
-for i in range(niter):
-    nhits = run_geom_corr(0, "0", i)
-    avg_hits += nhits
+if step1:
+    for direction in ["0","x","y","xy"]:
+        allhits = []
+        if direction != "0":
+            for inc in incs:
+                avg_hits = 0
+                for i in range(niter):
+                    _, _, nhits = run_geom_corr(inc, direction, i, results_folder, simulate=simulate, txt=txt, hitonly=hitsonly)
+                    avg_hits += nhits
+                allhits.append(avg_hits / niter)
+            np.savetxt(
+                    f"{results_folder}{direction}-hits.txt",
+                    np.array(allhits),
+                    delimiter=", ",
+                    fmt="%.14f",
+                )
+        else:
+            avg_hits = 0
+            for i in range(niter):
+                _, _, nhits = run_geom_corr(0, direction, i, results_folder, simulate=simulate, txt=txt, hitonly=hitsonly)
+                avg_hits += nhits
+            center_hits = avg_hits/niter
+            np.savetxt(
+                    f"{results_folder}{direction}-hits.txt",
+                    np.array([center_hits]),
+                    delimiter=", ",
+                    fmt="%.14f",
+                )       
 
-# save it
-center_hits = avg_hits / niter
-np.savetxt(
-    f"{data_folder}center-hits-norm.txt",
-    np.array([center_hits]),
-    delimiter=", ",
-    fmt="%.14f",
-)
+# -------- ------- STEP 2 : get the deconvolved image with the mask to get the FWHM and signal -------- -------
+step2 = True
+simulate = False
+txt = True
+hitsonly = False
 
-# run each direction hits - no mask
-all_hits = []
-for direction in ["x", "y", "xy"]:
-    total_hits = []
-    for inc in incs:
-        avg_hits = 0
-        for i in range(niter):
-            nhits = run_geom_corr(inc, direction, i)
-            avg_hits += nhits
-        total_hits.append((avg_hits / niter) / center_hits)
-    np.savetxt(
-        f"{data_folder}{direction}-hits-norm.txt",
-        np.array(total_hits),
-        delimiter=", ",
-        fmt="%.14f",
-    )
-    all_hits.append(total_hits)
+scale = None
 
-print(all_hits)
-"""
-# RUN SIGNAL NORMALIZATION ------------------ normalize total number of possible hits on detector
-# run center hits first
-"""
-avg_signal = 0
-fwhms = []
-for i in range(niter):
-    dec, fwhm = run_geom_corr(0, "0", i)
-    avg_signal += dec
-    fwhms.append(fwhm)
-    np.savetxt(
-        f"{data_folder}center-fwhm.txt",
-        np.array([fwhms]),
-        delimiter=", ",
-        fmt="%.14f",
-    )
-
-# save it
-
-sig_norm = avg_signal / niter
-np.savetxt(
-    f"{data_folder}center-sig-norm.txt",
-    np.array([sig_norm]),
-    delimiter=", ",
-    fmt="%.14f",
-)
-
-np.savetxt(
-    f"{data_folder}center-fwhm.txt",
-    np.array([fwhms]),
-    delimiter=", ",
-    fmt="%.14f",
-)
-
-# run each direction signal
-all_hits = []
-for direction in ["x", "y", "xy"]:
-    total_hits = []
-    all_fwhms = []
-    for inc in incs:
-        avg_hits = 0
+if step2:
+    for direction in ["0","xy"]:
         fwhms = []
-        for i in range(niter):
-            nhits, fwhm = run_geom_corr(inc, direction, i)
-            avg_hits += nhits
-            fwhms.append(fwhm)
-        # total_hits.append((avg_hits / niter) / sig_norm)
-        all_fwhms.append(fwhms)
-        # np.savetxt(
-        #    f"{data_folder}{direction}-sig.txt",
-        #    np.array(total_hits),
-        #    delimiter=", ",
-        #    fmt="%.14f",
-        # )
-        np.savetxt(
-            f"{data_folder}{direction}-fwhm.txt",
-            np.array(all_fwhms),
-            delimiter=", ",
-            fmt="%.14f",
-        )
-    np.savetxt(
-        f"{data_folder}{direction}-fwhm.txt",
-        np.array(all_fwhms),
-        delimiter=", ",
-        fmt="%.14f",
-    )
-    # all_hits.append(total_hits)
+        signals = []
+        if direction != "0":
+            for inc in incs:
+                print(inc)
+                avg_fwhm = 0
+                avg_signal = 0
+                for i in range(niter):
+                    signal, fwhm, _ = run_geom_corr(inc, direction, i, results_folder, simulate=simulate, txt=txt, hitsonly=hitsonly, scale=scale)
+                    avg_fwhm += fwhm
+                    avg_signal += signal
+                fwhms.append(avg_fwhm / niter)
+                signals.append(avg_signal / niter)
+            # save results
+            np.savetxt(
+                    f"{results_folder}{direction}-fwhm.txt",
+                    np.array(fwhms),
+                    delimiter=", ",
+                    fmt="%.14f",
+                )
+            np.savetxt(
+                    f"{results_folder}{direction}-signal.txt",
+                    np.array(signals),
+                    delimiter=", ",
+                    fmt="%.14f",
+                )
+            print("processed hits for direction ", direction)
+        
+        else:
+            fwhm_norm = 0
+            max_signal_norm = 0
+            for i in range(niter):
+                max_signal, fwhm, _ = run_geom_corr(0, direction, i, results_folder, simulate=simulate, txt=txt, hitsonly=hitsonly, scale=scale)
+                
+                fwhm_norm += fwhm
+                max_signal_norm += max_signal
 
-# print(all_hits)
+            avg_fwhm_norm = fwhm_norm / niter  
+            avg_max_signal_norm = max_signal_norm / niter
 
+            scale = avg_max_signal_norm
 
-# Define the input and output file paths
-for direction in ["x", "y", "xy"]:
-    input_file_path = f"{data_folder}{direction}-fwhm.txt"
-    output_file_path = f"{data_folder}{direction}-average-fwhm.txt"
-
-    # Read the input file
-    with open(input_file_path, "r") as input_file:
-        lines = input_file.readlines()
-
-    # Initialize an empty list to store the averages
-    averages = []
-
-    # Process each row in the input data
-    for line in lines:
-        # Split the line into a list of numbers, assuming they are separated by commas
-        numbers = [float(x) for x in line.strip().split(",")]
-
-        # Calculate the average of the numbers in the row
-        row_average = sum(numbers) / len(numbers)
-
-        # Append the average to the list
-        averages.append(row_average)
-
-    # Save the averages to the output file
-    with open(output_file_path, "w") as output_file:
-        for average in averages:
-            output_file.write(f"{average:.14f}\n")
-
-    print(f"Averages saved to {output_file_path}")
-"""
-
-directions = ["x", "y", "xy"]
-for direction in directions:
-    file_path = f"{data_folder}{direction}-average-fwhm.txt"  # Change this to the path of your data file
-    data = np.loadtxt(file_path)
-
-    import numpy as np
-    from scipy.interpolate import CubicSpline
-
-    # 2. Fit a cubic spline curve to the data
-    x = np.arange(len(data))  # Generate x values as integers from 0 to N-1
-    coefficients = np.polyfit(x, data, 2)  # Fit a first-degree (linear) polynomial
-    print(coefficients)
-    # The coefficients now contain the slope and intercept of the fitted line.
-    a, b, c = coefficients
-    print(f"The quadratic polynomial coefficients are: a={a}, b={b}, c={c}")
-
-    # You can create a polynomial function using these coefficients:
-    poly_func = np.poly1d(coefficients)
-    calculated_values = poly_func(x)
-
-    # 4. Save the calculated values to a new text file
-    output_file_path = f"{data_folder}{direction}-fwhm-calc.txt"  # Change this to your desired output file path
-    np.savetxt(output_file_path, calculated_values, fmt="%.6f", delimiter="\n")
-
-    print(f"Calculated values saved to {output_file_path}")
+            np.savetxt(
+                        f"{results_folder}{direction}-fwhm.txt",
+                        np.array([avg_fwhm_norm]),
+                        delimiter=", ",
+                        fmt="%.14f",
+                    )   
+            np.savetxt(
+                        f"{results_folder}{direction}-signal.txt",
+                        np.array([avg_max_signal_norm]),
+                        delimiter=", ",
+                        fmt="%.14f",
+                    )     
+            print("processed center hits with scale ", scale)

@@ -5,8 +5,10 @@ from simulation_engine import SimulationEngine
 from hits import Hits
 from scattering import Scattering
 from deconvolution import Deconvolution
+from plotting.calculate_solid_angle import get_sr
 
 import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 
 import numpy as np
 import os
@@ -14,6 +16,8 @@ import copy
 
 # construct = CA and TD
 # source = DS and PS
+
+plot = False
 
 simulation_engine = SimulationEngine(construct="CA", source="PS", write_files=False)
 
@@ -51,22 +55,45 @@ distance = 2  # cm
 
 fake_radius = 1
 
-# flat field array
-txt_folder = "/home/rileyannereid/workspace/geant4/simulation-results/aperture-collimation/61-2-400/"
-flat_field = np.loadtxt(f"{txt_folder}interp_grid.txt")
+pixel_size = pixel * 0.1  # cm
+pixel_count = n_elements_original * multiplier
 
-# before i run this, get point source strength
-# re run the plotting script
+# ---------- flat field array loading -------
+# Load x and y values from separate text files
+txt_folder = "./results/61-2-400/"
 
-signals = []
-uncertanties = []
-central_angles = []
-all_indices = []
+hits = False
+remove_edges = True
+
+if remove_edges:
+    edges_str = "edges-removed"
+else:
+    edges_str = "edges-inc"
+if hits:
+    hits_str = "instrument-only"
+else:
+    hits_str = "shielding-inc"
+
+data_product = "fwhm"
+output_name = f"{txt_folder}{data_product}_interp_grid_{hits_str}_{edges_str}"
+fwhm_map = np.loadtxt(f"{output_name}.txt")
+
+# geometric pixel counting method
+signals_geo = []
+uncertanties_geo = []
+central_angles_geo = []
+all_indices_geo = []
+
+# simulation method (using source)
+uncertanties_sim = []
+
 # ------------------- simulation parameters ------------------
-n_particles = 1e8
+n_particles = 5e8
 ii = 0
 
-for theta in thetas:
+thetas_run = thetas[5:38]
+for theta in thetas_run:
+    #print("running ", theta)
     # --------------set up simulation---------------
     simulation_engine.set_config(
         det1_thickness_um=300,
@@ -88,9 +115,8 @@ for theta in thetas:
 
     # --------------set up data naming---------------
     formatted_theta = "{:.0f}p{:02d}".format(int(theta), int((theta % 1) * 100))
-    fname_tag = f"{n_elements_original}-{distance}-{formatted_theta}-deg-d3-5p3"
-    # fname = f"../simulation-data/rings/{fname_tag}_{n_particles:.2E}_{energy_type}_{energy_level}_{formatted_theta}.csv"
-    fname = f"../simulation-results/rings/{fname_tag}_{n_particles:.2E}_{energy_type}_{energy_level}_raw.txt"
+    fname_tag = f"{n_elements_original}-{distance}-{formatted_theta}-deg-d2-4p5"
+    fname = f"./results/rings/{fname_tag}_{n_particles:.2E}_{energy_type}_{energy_level}_raw.txt"
 
     simulation_engine.set_macro(
         n_particles=int(n_particles),
@@ -138,66 +164,108 @@ for theta in thetas:
         hits_txt=True,
     )
 
+    #mx, my = deconvolver.reverse_raytrace()
+    #deconvolver.export_to_matlab(np.column_stack((mx, my)))
+
     signal = deconvolver.deconvolved_image
+    
+    # for now, take a small upper section without banding
+    # subtract RMS!
+    noise_floor = np.mean(signal[:20,:20])
 
-    noise_floor = np.average(deconvolver.deconvolved_image[:40, :40])
+    # subtract the noise floor
+    signal = signal - noise_floor
 
-    # calculate angle of each pixel lol
-    pixel_size = pixel * 0.1  # cm
-    pixel_count = n_elements_original * multiplier
+    if plot:
+        plt.imshow(signal)
 
-    # Initialize an empty list to store the coordinates
-    angles = []
-    center_pixel = 61
-
+    # save the geometrical angles that correspond to each pixel with signal
+    angles_geo = []
+    px_coverage_geo = []
     signal_sum = 0
 
-    # max signal
+    center_pixel = 61 # 122 pixels, center is between index 60 and 61 ????
+    indices = []
+
+    # find max signal and relative location
     max_value = np.max(signal)
     max_indices = np.argwhere(signal == max_value)
     max_indices = max_indices[0]
 
-    indices = []
+    relative_xmax = (max_indices[1] - center_pixel) * pixel_size
+    relative_ymax = (max_indices[0] - center_pixel) * pixel_size
 
+    # calculate central angle based on pixel w max signal
+    aamax = np.sqrt(relative_xmax**2 + relative_ymax**2)
+    central_angle = np.arctan(aamax / distance)
+    central_angles_geo.append(np.rad2deg(central_angle))
+    phi = 0
     for x in range(pixel_count):
         for y in range(pixel_count):
-            # Calculate the relative position from the center
-            relative_x = (x - center_pixel) * pixel_size
-            relative_y = (y - center_pixel) * pixel_size
+            # find pixels with signal over threshold
+            if signal[y, x] > max_value / 2:
+                relative_x = (x - center_pixel) * pixel_size
+                relative_y = (y - center_pixel) * pixel_size
 
-            aa = np.sqrt(relative_x**2 + relative_y**2)
+                aa = np.sqrt(relative_x**2 + relative_y**2)
 
-            angle = np.arctan(aa / distance)
+                # find the geometrical theta angle of the pixel
+                angle = np.arctan(aa / distance)
 
-            if signal[y, x] > noise_floor * 2:
-                angles.append(np.rad2deg(angle))
-                signal_sum += signal[y, x]
-                indices.append((y, x))
-                if y == max_indices[0] and x == max_indices[1]:
-                    central_angles.append(np.rad2deg(angle))
-                    # print(np.rad2deg(angle))
-                    # print(max_indices)
+                # largest expected distance is 3 pixels  -- check that we are within that
+                largest_expected_px_distance = np.rad2deg(np.arctan(2.7 * pixel_size / distance))
+                if np.abs(np.rad2deg(angle) - np.rad2deg(central_angle)) < largest_expected_px_distance:
+                    
+                    # save the geometrical angle and the signal of the pixel
+                    angles_geo.append(np.rad2deg(angle))
 
-    uncertanties.append((min(angles) - max(angles)) / 2)
-    signals.append(signal_sum / 23284156.432142716)
-    all_indices.append(indices)
+                    # save the indices of the pixel for later
+                    indices.append((y, x))
+
+                    # and get the solid angle coverage of the pixel
+                    fwhm = fwhm_map[y, x] * pixel_size
+                    sphere_radius = 8
+                    sr, pe = get_sr(distance, fwhm, fwhm, (relative_x, relative_y), sphere_radius)
+                    phi += pe
+                    # units are now counts(?) per solid angle
+
+                    signal_sum += signal[y, x] /  sr
+
+                    if plot:
+                        # for plotting the pixels that are identified with signal
+                        rect = patches.Rectangle((x - 0.5, y - 0.5), 1, 1, linewidth=2, edgecolor='red', facecolor='none')
+                        plt.gca().add_patch(rect)
+    if plot:
+        plt.show()
+    # find the uncertainty in the angle with the geometrical method as the angular spread
+    uncertanties_geo.append(np.abs((min(angles_geo) - max(angles_geo)) / 2))
+
+    # now find the corresponding FWHM based on the pixel with max signal
+    uncertanties_sim.append(np.rad2deg(np.arctan(pixel_size * fwhm_map[max_indices[0], max_indices[1]] / distance)))
+
+    # save the total signal strength
+    #print(signal_sum) 
+
+    # go from counts / sr to counts / sr / cm^2
+    signals_geo.append(signal_sum / (len(angles_geo) * pixel_size**2))
+
+    # save the indices of the pixels with signal for later
+    all_indices_geo.append(indices)
 
     ii += 1
 
-# Create the scatter plot
-plt.scatter(central_angles, signals, label="Data Points", marker="o", s=8)
+central_angles_sim = thetas_run
 
-# Plot x-axis uncertainty bars
-for x, x_err, y in zip(central_angles, uncertanties, signals):
-    plt.plot([x - x_err, x + x_err], [y, y], color="blue")
+# save results
+results_dir = "./results/"
+np.savetxt(f"{results_dir}uncertainties-geo.txt", np.array(uncertanties_geo))
+np.savetxt(f"{results_dir}uncertainties-sim.txt", np.array(uncertanties_sim))
+np.savetxt(f"{results_dir}central-angles-geo.txt", np.array(central_angles_geo))
+np.savetxt(f"{results_dir}central-angles-sim.txt", np.array(central_angles_sim))
 
-plt.savefig("../simulation-results/rings/pitch-angle-distribution.png")
-
-np.savetxt("../simulation-results/rings/uncertainties.txt", np.array(uncertanties))
-np.savetxt("../simulation-results/rings/central-angles.txt", np.array(central_angles))
-
-with open("../simulation-results/rings/inds.txt", "w") as file:
-    for sublist in all_indices:
+# and save all the indices nicely if we need them
+with open(f"{results_dir}inds.txt", "w") as file:
+    for sublist in all_indices_geo:
         for x, y in sublist:
             # Convert the tuple to a formatted string (e.g., "1,2")
             line = f"{x},{y}\n"
@@ -205,11 +273,24 @@ with open("../simulation-results/rings/inds.txt", "w") as file:
         # Add a newline character after each sublist
         file.write("\n")
 
+# -----------plotting-------------
+# Create the scatter plot
+plt.clf()
+plt.scatter(central_angles_geo, signals_geo, label="Data Points", marker="o", s=8)
 
-# TODO: should I use the central angle or the simulation angle
-# for now, use central angle
+# Plot x-axis uncertainty bars
+for x, x_err, y in zip(central_angles_geo, uncertanties_geo, signals_geo):
+    plt.plot([x - x_err, x + x_err], [y, y], color="blue")
 
+plt.savefig(f"{results_dir}pitch-angle-distribution-geo.png")
+plt.clf()
 
-# could have tiers of thresholds - highest (max
-# if pixel is more than a few pixels away from a high tier pixel, likely an error
-# pull up a plot to confirm this
+# Create the scatter plot
+plt.scatter(central_angles_sim, signals_geo, label="Data Points", marker="o", s=8)
+
+# Plot x-axis uncertainty bars
+for x, x_err, y in zip(central_angles_sim, uncertanties_geo, signals_geo):
+    plt.plot([x - x_err, x + x_err], [y, y], color="blue")
+
+plt.savefig(f"{results_dir}pitch-angle-distribution-sim.png")
+plt.clf()

@@ -10,13 +10,12 @@ from matplotlib.colors import LogNorm
 from mpl_toolkits.mplot3d import Axes3D
 from scipy.ndimage import zoom
 from scipy.signal import peak_widths, find_peaks
+import scipy.optimize as opt
+from scipy.io import savemat
 import sys
 
 sys.path.insert(1, "../coded_aperture_mask_designs")
 from util_fncs import makeMURA, make_mosaic_MURA, get_decoder_MURA
-
-from scipy.io import savemat
-
 
 class Deconvolution:
     def __init__(
@@ -238,7 +237,6 @@ class Deconvolution:
 
         # scipy.ndimage.zoom used here
         resizedIm = zoom(self.rawIm, len(self.decoder) / len(self.rawIm))
-        print(np.shape(self.rawIm))
 
         # Fourier space multiplication
         Image = np.real(
@@ -461,12 +459,11 @@ class Deconvolution:
             self.get_raw()
             if apply_distribution:
                 self.apply_dist(dist_type)
+            np.savetxt(f"{save_raw_heatmap[:-3]}txt", self.raw_heatmap)
         elif hits_txt:
-            self.raw_heatmap = zoom(self.hits_data, 0.5)
+            self.raw_heatmap = self.hits_data
         if plot_raw_heatmap:
             self.plot_heatmap(self.raw_heatmap, save_name=save_raw_heatmap, vmax=vmax)
-
-        np.savetxt(f"{save_raw_heatmap[:-3]}txt", self.raw_heatmap)
 
         # get mask and decoder
         self.get_mask(self.simulation_engine.mosaic)
@@ -540,18 +537,10 @@ class Deconvolution:
         """
         return
 
-    def plot_3D_signal(self, save_name):
-        # Define the grid of x and y values
-        heatmap = self.deconvolved_image
-        noise = np.mean(heatmap[10:50, 10:50])
-        heatmap = heatmap - noise
-
+    def plot_3D_signal(self, heatmap, heatmap2= None, save_name= None):
         x = np.arange(heatmap.shape[0])
         y = np.arange(heatmap.shape[1])
-
-        range1 = 56
-        range2 = 70
-        X, Y = np.meshgrid(x[range1:range2], y[range1:range2])
+        X, Y = np.meshgrid(x, y)
 
         # Create a 3D figure
         plt.clf()
@@ -560,8 +549,12 @@ class Deconvolution:
 
         # Create the surface plot!
         surface = ax.plot_surface(
-            X, Y, heatmap[range1:range2, range1:range2], cmap=cmap, vmax=30000
+            X, Y, heatmap, cmap=cmap
         )
+        if heatmap2 is not None:
+            surface = ax.plot_surface(
+                X, Y, heatmap2, color="r", alpha=0.2
+            )
 
         # Add a color bar for reference
         fig.colorbar(surface)
@@ -572,22 +565,115 @@ class Deconvolution:
         ax.set_zlabel("signal")
         # ax.set_zlim([np.amax(heatmap) / 2, np.amax(heatmap)])
         plt.show()
+        plt.clf()
         # plt.savefig(save_name, dpi=300)
 
-    def calculate_fwhm(self):
-        data = self.deconvolved_image
+    def calculate_fwhm(self, direction, max_index, scale):
 
-        # noise floor
-        noise = np.mean(data[5:55, 5:55])
-        data = data - noise
+        def gaussian2d(xy, xo, yo, sigma_x, sigma_y, amplitude, offset):
+            xo = float(xo)
+            yo = float(yo)    
+            x, y = xy
+            gg = offset + amplitude*np.exp( - (((x-xo)**2)/(2*sigma_x**2) + ((y-yo)**2)/(2*sigma_y**2)))
+            return gg.ravel()
 
-        amp = np.max(data)
-        half_max = amp / 2.0
 
-        # find indices with values greater than or equal to half max
-        px = data[data >= half_max]
+        def getFWHM_GaussianFitScaledAmp(img, direction):
+            """Get FWHM(x,y) of a blob by 2D gaussian fitting
+            Parameter:
+                img - image as numpy array
+            Returns: 
+                FWHMs in pixels, along x and y axes.
+            """
+            x = np.linspace(0, img.shape[1], img.shape[1])
+            y = np.linspace(0, img.shape[0], img.shape[0])
+            x, y = np.meshgrid(x, y)
 
-        return len(px) + 1
+            initial_guess = (img.shape[1]/2,img.shape[0]/2,2,2,1,0)
+            params, _ = opt.curve_fit(gaussian2d, (x, y), img.ravel(), p0=initial_guess)
+            xcenter, ycenter, sigmaX, sigmaY, amp, offset = params
+
+            FWHM_x = 2*sigmaX*np.sqrt(2*np.log(2))
+            FWHM_y = 2*sigmaY*np.sqrt(2*np.log(2))
+
+            # return based on direction
+            if direction == "x":
+                fwhm = FWHM_y
+            elif direction == "y":
+                fwhm = FWHM_x
+            else:
+                if FWHM_x > FWHM_y:
+                    fwhm = FWHM_x
+                else:
+                    fwhm = FWHM_y
+            
+            return fwhm, params
+
+        # get the shifted image and scale 
+        img = self.shifted_image / scale # this is the average signal over 0 after shifting for pt source centered
+        import matplotlib.pyplot as plt
+
+        sect = 10
+
+        # get the section where the signal is
+        img_bound = img.shape[0] - 1
+        if max_index[0] > img_bound-sect and max_index[1] < img_bound-sect:
+            img_clipped = img[max_index[0]-sect:, max_index[1]-sect:max_index[1]+sect+1]
+
+            missing_rows = img_bound - max_index[0]
+            missing_signal = img[max_index[0]-sect:max_index[0]-missing_rows, max_index[1]-sect:max_index[1]+sect+1]
+            flipped_pre_signal = missing_signal[::-1]
+            img_clipped = np.vstack((img_clipped, flipped_pre_signal))
+
+
+        elif max_index[1] > img_bound - sect and max_index[0] < img_bound-sect:
+            img_clipped = img[max_index[0]-sect:max_index[0]+sect+1, max_index[1]-sect:]
+            
+            missing_cols = img_bound - max_index[1]
+            missing_signal = img[max_index[0]-sect:max_index[0]+sect+1, max_index[1]-sect:max_index[1]-missing_cols]
+            flipped_pre_signal = missing_signal[:, ::-1]
+            img_clipped = np.hstack((img_clipped, flipped_pre_signal))
+
+
+        elif max_index[0] > img_bound-sect and max_index[1] > img_bound-sect: 
+            img_clipped = img[max_index[0]-sect:,max_index[1]-sect:]
+            
+            missing_rows = img_bound - max_index[0]
+            missing_signal = img[max_index[0]-sect:max_index[0]-missing_rows, max_index[1]-sect:]
+            flipped_pre_signal = missing_signal[::-1]
+            img_clipped = np.vstack((img_clipped, flipped_pre_signal))
+
+            missing_cols = img_bound - max_index[1]
+            missing_signal = img_clipped[:, :(sect-missing_cols)]
+            flipped_pre_signal = missing_signal[:, ::-1]
+            img_clipped = np.hstack((img_clipped, flipped_pre_signal))
+
+        else:
+            img_clipped = img[max_index[0]-sect:max_index[0]+sect+1,max_index[1]-sect:max_index[1]+sect+1]
+
+        FWHM, params = getFWHM_GaussianFitScaledAmp(img_clipped, direction) 
+
+        # for plotting if interested
+        xcenter, ycenter, sigmaX, sigmaY, amp, offset = params
+        x = np.linspace(0, img_clipped.shape[1], 1000)
+        y = np.linspace(0, img_clipped.shape[0], 1000)
+        x, y = np.meshgrid(x, y)
+        g2d = offset + amp*np.exp( - (((x-xcenter)**2)/(2*sigmaX**2) + ((y-ycenter)**2)/(2*sigmaY**2)))
+
+        #self.plot_3D_signal(img_clipped)
+
+        return FWHM
+
+    def shift_noise_floor_ptsrc(self, row, col):
+        # shift the image down to the noise floor
+        # exclude the banding artifacts
+        noise_floor = np.ones_like(self.deconvolved_image, dtype=bool)
+        noise_floor[row-1:row+2, :] = False
+        noise_floor[:, col-1:col+2] = False
+        average_noise = np.mean(self.deconvolved_image[noise_floor])
+
+        self.shifted_image = self.deconvolved_image - average_noise
+        return self.shifted_image
 
     def reverse_raytrace(self):
         # attempt to reverse ray trace each pixel through each coded aperture hole

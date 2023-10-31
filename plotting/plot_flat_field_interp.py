@@ -3,46 +3,85 @@ from scipy import interpolate
 import matplotlib.pyplot as plt
 
 # Load x and y values from separate text files
-txt_folder = "/home/rileyannereid/workspace/geant4/simulation-results/aperture-collimation/61-2-400-d3-2p25/"
-zx = np.loadtxt(f"{txt_folder}x-sig.txt")
-zy = np.loadtxt(f"{txt_folder}y-sig.txt")
-zz = np.loadtxt(f"{txt_folder}xy-sig.txt")
+txt_folder = "./results/61-2-400/"
+
+hits = False
+remove_edges = True
+
+if remove_edges:
+    edges_str = "edges-removed"
+else:
+    edges_str = "edges-inc"
+if hits:
+    hits_str = "instrument-only"
+else:
+    hits_str = "shielding-inc"
+
+data_product = "fwhm"
+output_name = f"{txt_folder}{data_product}_interp_grid_{hits_str}_{edges_str}"
+
+# load data
+zx = np.loadtxt(f"{txt_folder}x-{data_product}.txt")
+zy = np.loadtxt(f"{txt_folder}y-{data_product}.txt")
+zz = np.loadtxt(f"{txt_folder}xy-{data_product}.txt")
+
+zc = np.loadtxt(f"{txt_folder}0-{data_product}.txt")
+zc = float(zc)
 
 # hits - if we want to see flat field of instrument response (only)
-"""
-hx = np.loadtxt(f"{txt_folder}x-hits-norm.txt")
-hy = np.loadtxt(f"{txt_folder}y-hits-norm.txt")
-hz = np.loadtxt(f"{txt_folder}xy-hits-norm.txt")
+if hits and data_product == "signal":
+    hx = np.loadtxt(f"{txt_folder}x-hits.txt")
+    hy = np.loadtxt(f"{txt_folder}y-hits.txt")
+    hz = np.loadtxt(f"{txt_folder}xy-hits.txt")
 
-zx = np.array([z * 1 / h for z, h in zip(zx, hx)])
-zy = np.array([z * 1 / h for z, h in zip(zy, hy)])
-zz = np.array([z * 1 / h for z, h in zip(zz, hz)])
-"""
-zx = zx[:-1]
-zy = zy[:-1]
-zz = zz[:-1]
+    hc = np.loadtxt(f"{txt_folder}0-hits.txt")
+    hc = float(hc)
 
-zx = np.insert(zx, 0, 1)
-zy = np.insert(zy, 0, 1)
-zz = np.insert(zz, 0, 1)
+    zx = np.array([(z/zc) * 1 / (h/hc) for z, h in zip(zx, hx)])
+    zy = np.array([(z/zc) * 1 / (h/hc) for z, h in zip(zy, hy)])
+    zz = np.array([(z/zc) * 1 / (h/hc) for z, h in zip(zz, hz)])
+    zx = np.insert(zx, 0, 1)
+    zy = np.insert(zy, 0, 1)
+    zz = np.insert(zz, 0, 1) 
 
-# replace the edge value
-x_values = np.linspace(0, 28, 15)
 
-# Perform cubic interpolation using CubicSpline
-cubic_spline = interpolate.CubicSpline(x_values, zx)
-extrap_x = cubic_spline(30)
+elif data_product == "signal":
+    zx = np.array([(z/zc) for z in zx])
+    zy = np.array([(z/zc) for z in zy])
+    zz = np.array([(z/zc) for z in zz]) 
+    zx = np.insert(zx, 0, 1)
+    zy = np.insert(zy, 0, 1)
+    zz = np.insert(zz, 0, 1) 
 
-cubic_spline = interpolate.CubicSpline(x_values, zy)
-extrap_y = cubic_spline(30)
 
-cubic_spline = interpolate.CubicSpline(x_values, zz)
-extrap_z = cubic_spline(30)
+else:
+    # add in central fwhm
+    zx = np.insert(zx, 0, zc)
+    zy = np.insert(zy, 0, zc)
+    zz = np.insert(zz, 0, zc)
 
-# insert them
-zx = np.append(zx, extrap_x)
-zy = np.append(zy, extrap_y)
-zz = np.append(zz, extrap_z)
+if remove_edges:
+    zx = zx[:-1]
+    zy = zy[:-1]
+    zz = zz[:-1]
+
+    # replace the edge value
+    x_values = np.linspace(0, 28, 15)
+
+    # Perform cubic interpolation using CubicSpline
+    cubic_spline = interpolate.CubicSpline(x_values, zx)
+    extrap_x = cubic_spline(30)
+
+    cubic_spline = interpolate.CubicSpline(x_values, zy)
+    extrap_y = cubic_spline(30)
+
+    cubic_spline = interpolate.CubicSpline(x_values, zz)
+    extrap_z = cubic_spline(30)
+
+    # insert them
+    zx = np.append(zx, extrap_x)
+    zy = np.append(zy, extrap_y)
+    zz = np.append(zz, extrap_z)
 
 # Create an array in reverse order
 reverse_zx = np.flip(zx)
@@ -58,9 +97,6 @@ stacked_zz = np.hstack((reverse_zz, zz[1:]))
 x = np.linspace(-30, 30, 31)
 y = np.linspace(-30, 30, 31)
 
-# x = x[1:-1]
-# y = y[1:-1]
-
 xcrs = np.array([(xx, 0) for xx in x])
 ycrs = np.array([(0, yy) for yy in y])
 
@@ -68,16 +104,9 @@ ycrs = np.array([(0, yy) for yy in y])
 main_diagonal = np.array([(i - 30, i - 30) for i in range(0, 61, 2)])
 other_diagonal = np.array([(i - 30, 30 - i) for i in range(0, 61, 2)])
 
-# exclude corner points for now
-# main_diagonal = main_diagonal[1:-1]
-# other_diagonal = other_diagonal[1:-1]
-
 # Define the grid where you want to interpolate
 x_new = np.linspace(-30, 30, 122)
 y_new = np.linspace(-30, 30, 122)
-
-# x_new = x_new[2:-2]
-# y_new = y_new[2:-2]
 
 x_new_grid, y_new_grid = np.meshgrid(x_new, y_new)
 
@@ -88,7 +117,7 @@ values = np.concatenate((stacked_zx, stacked_zy, stacked_zz, stacked_zz))
 # Perform interpolation
 z_new = interpolate.griddata(points, values, (x_new_grid, y_new_grid), method="cubic")
 np.savetxt(
-    f"{txt_folder}interp_grid.txt",
+    f"{output_name}.txt",
     z_new,
 )
 
@@ -111,14 +140,14 @@ plt.ylabel("Y")
 
 plt.subplot(1, 2, 2)
 plt.title("Interpolated Surface")
-plt.contourf(x_new_grid, y_new_grid, z_new, cmap="viridis", levels=100, vmax=1)
+plt.contourf(x_new_grid, y_new_grid, z_new, cmap="viridis", levels=100)
 plt.colorbar(label="Z Value")
 plt.xlabel("X")
 plt.ylabel("Y")
 
 plt.tight_layout()
 # plt.gca().set_aspect("equal")
-plt.savefig(f"{txt_folder}interpolation-corrected.png", dpi=300)
+plt.savefig(f"{output_name}.png", dpi=300)
 
 # Create a 3D figure
 plt.clf()
@@ -135,27 +164,4 @@ fig.colorbar(surface)
 ax.set_xlabel("pixel")
 ax.set_ylabel("pixel")
 ax.set_zlabel("signal")
-plt.savefig(f"{txt_folder}interpolation-corrected-3D.png", dpi=300)
-"""
-import numpy as np
-import matplotlib.pyplot as plt
-from scipy.optimize import curve_fit
-
-
-def func(x, a, c):
-    return a * (np.sin(np.sqrt(x[0] ** 2 + x[1] ** 2))) + c
-
-
-size = x_new_grid.shape
-x1_1d = x_new_grid.reshape((1, np.prod(size)))
-x2_1d = y_new_grid.reshape((1, np.prod(size)))
-
-xdata = np.vstack((x1_1d, x2_1d))
-
-Z_new = z_new.reshape(size)
-
-popt, pcov = curve_fit(func, xdata, z_new.flatten())
-
-z_fit = func(xdata, *popt)
-Z_fit = z_fit.reshape(size)
-"""
+plt.savefig(f"{output_name}_3D.png", dpi=300)
