@@ -136,23 +136,7 @@ def write_pt_macro(
             f.write("/gps/ang/minphi 0 deg \n")
             f.write("/gps/ang/maxphi 360 deg \n")
             f.write("/gps/energy " + str(ene) + " keV \n")
-            f.write("/analysis/setFileName %s \n" % fname_tag)
-            f.write("/analysis/h1/set 1 100 100 1000 keV \n")
-            f.write(
-                f"/analysis/h2/set 1 100 {pos[0]-5} {pos[0]+5} cm none linear 100 {pos[1]-5} {pos[1]+5} cm none linear \n"
-            )
-            f.write(
-                f"/analysis/h2/set 2 100 {pos[1]-5} {pos[1]+5} cm none linear 100 {pos[2]-5} {pos[2]+5} cm none linear \n"
-            )
-            f.write(
-                f"/analysis/h2/set 3 100 {pos[2]-5} {pos[2]+5} cm none linear 100 {pos[0]-5} {pos[0]+5} cm none linear \n"
-            )
-            f.write(
-                "/analysis/h2/set 4 120 0 360 deg none linear 100 -1 1 none none linear \n"
-            )
-            f.write(
-                "/analysis/h2/set 5 120 0 360 deg none linear  90 0 180 deg none linear \n"
-            )
+            
             f.write("/run/printProgress %d \n" % int(progress_mod))
             f.write("/run/beamOn " + str(int(n_particles)) + "\n")
 
@@ -295,24 +279,7 @@ def write_surface_macro(
         else:
             f.write("/gps/ene/min %.2f keV \n" % ene_min_keV)
             f.write("/gps/ene/max %.2f keV \n" % ene_max_keV)
-        f.write(f"/analysis/setFileName {fname_tag} \n")
-
-        f.write("/analysis/h1/set 1 100 100 1000 keV \n")
-        f.write(
-            f"/analysis/h2/set 1 100 {pos[0]-5} {pos[0]+5} cm none linear 100 {pos[1]-5} {pos[1]+5} cm none linear \n"
-        )
-        f.write(
-            f"/analysis/h2/set 2 100 {pos[1]-5} {pos[1]+5} cm none linear 100 {pos[2]-5} {pos[2]+5} cm none linear \n"
-        )
-        f.write(
-            f"/analysis/h2/set 3 100 {pos[2]-5} {pos[2]+5} cm none linear 100 {pos[0]-5} {pos[0]+5} cm none linear \n"
-        )
-        f.write(
-            "/analysis/h2/set 4 120 0 360 deg none linear 100 -1 1 none none linear \n"
-        )
-        f.write(
-            "/analysis/h2/set 5 120 0 360 deg none linear  90 0 180 deg none linear \n"
-        )
+        
         # get a progress bar
         f.write("/run/printProgress %d \n" % int(progress_mod))
         f.write("/run/beamOn %d \n" % int(n_particles))
