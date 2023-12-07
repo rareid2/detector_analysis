@@ -182,6 +182,7 @@ class SimulationEngine:
         confine: bool = False,
         detector_dim: float = 1.408,
         theta: float = None,
+        ring: float = False,
     ) -> None:
         """
         create macro file based on simulation type -- see macros.py for function defs
@@ -192,6 +193,20 @@ class SimulationEngine:
         # assign for later use
         self.n_particles = n_particles
         self.radius_cm = radius_cm
+
+        # we need the coded aperture position to center the sphere
+        with open(os.path.join(EPAD_dir, "coded_aperture_position.txt"), "r") as file:
+            # Read the first line and ignore it (assuming it's not the number we want).
+            file.readline()
+
+            # Read the number from the second line and convert it to a float (or int if needed).
+            second_line = file.readline().strip()
+
+            if not second_line:
+                ca_pos = -499.95
+            else:
+                ca_pos = round(float(second_line) / 10, 3)
+                # + 0.001  # bump but not sure why - dont need to y align
 
         if self.write_files:
             if self.construct == "TD" and self.source == "PS":
