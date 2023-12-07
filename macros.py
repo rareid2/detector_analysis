@@ -136,7 +136,7 @@ def write_pt_macro(
             f.write("/gps/ang/minphi 0 deg \n")
             f.write("/gps/ang/maxphi 360 deg \n")
             f.write("/gps/energy " + str(ene) + " keV \n")
-            
+
             f.write("/run/printProgress %d \n" % int(progress_mod))
             f.write("/run/beamOn " + str(int(n_particles)) + "\n")
 
@@ -213,6 +213,7 @@ def write_surface_macro(
     ca_pos: float = 498.91,
     confine: bool = False,
     world_offset: float = 499.95,
+    ring: bool = False,
 ) -> None:
     """
     create macro file for a point source (or multiple point sources)
@@ -238,18 +239,22 @@ def write_surface_macro(
         f.write("/tracking/verbose 0 \n")
 
         f.write("/gps/particle e- \n")
-        f.write("/gps/pos/type Plane \n")
-        f.write("/gps/pos/shape Square \n")
-        f.write("/gps/pos/halfx 4.525 cm \n")
-        f.write("/gps/pos/halfy 4.525 cm \n")
-
-        # f.write(f"/gps/pos/radius {radius_cm} cm \n")
+        if ring:
+            f.write("/gps/pos/type Plane \n")
+            f.write("/gps/pos/shape Square \n")
+            f.write("/gps/pos/halfx 4.64 cm \n")
+            f.write("/gps/pos/halfy 4.64 cm \n")  # 3.72066
+            f.write(f"/gps/pos/centre 0 0 {ca_pos-3} cm \n")
+        else:
+            f.write("/gps/pos/type Surface \n")
+            f.write("/gps/pos/shape Sphere \n")
+            f.write(f"/gps/pos/radius {radius_cm} cm \n")
+            f.write(f"/gps/pos/centre 0 0 499.95 cm \n")  # move it by just a micron
 
         # center chosen to align with pinhole (maybe change this?)
         # 499.935 is the front face of detector 1
         # f.write(f"/gps/pos/centre 0 {ca_pos} {world_offset} cm \n")  # - for y align
         # pos = [0, ca_pos, world_offset]
-        f.write(f"/gps/pos/centre 0 0 {ca_pos-2} cm \n")
         pos = [0, 0, ca_pos]
 
         # write the confinement to the volume
@@ -264,14 +269,39 @@ def write_surface_macro(
             f.write("/gps/ang/surfnorm false \n")
             f.write("/gps/hist/type theta \n")
             f.write(f"/gps/hist/point {np.deg2rad(theta)} 1 \n")
-
-        else:
+            """
+            f.write(f"/gps/hist/point 0.000000 0.000000 \n")
+            f.write(f"/gps/hist/point 0.063466 0.063423 \n")
+            f.write(f"/gps/hist/point 0.126933 0.126592 \n")
+            f.write(f"/gps/hist/point 0.190399 0.189251 \n")
+            f.write(f"/gps/hist/point 0.253866 0.251148 \n")
+            f.write(f"/gps/hist/point 0.317332 0.312033 \n")
+            f.write(f"/gps/hist/point 0.380799 0.371662 \n")
+            f.write(f"/gps/hist/point 0.444265 0.429794 \n")
+            f.write(f"/gps/hist/point 0.507732 0.486196 \n")
+            f.write(f"/gps/hist/point 0.571198 0.540641 \n")
+            f.write(f"/gps/hist/point 0.634665 0.592910 \n")
+            f.write(f"/gps/hist/point 0.698131 0.642788 \n")
+            f.write(f"/gps/hist/point 0.761598 0.690079 \n")
+            f.write(f"/gps/hist/point 0.825065 0.734591 \n")
+            f.write(f"/gps/hist/point 0.888531 0.776146 \n")
+            f.write(f"/gps/hist/point 0.951998 0.814575 \n")
+            f.write(f"/gps/hist/point 1.015464 0.849725 \n")
+            f.write(f"/gps/hist/point 1.078931 0.881453 \n")
+            f.write(f"/gps/hist/point 1.142397 0.909632 \n")
+            f.write(f"/gps/hist/point 1.205864 0.934147 \n")
+            f.write(f"/gps/hist/point 1.269330 0.954902 \n")
+            f.write(f"/gps/hist/point 1.332797 0.971811 \n")
+            f.write(f"/gps/hist/point 1.396263 0.984808 \n")
+            f.write(f"/gps/hist/point 1.459730 0.993838 \n")
+            f.write(f"/gps/hist/point 1.523196 0.998867 \n")
+            """
+        else:  # doing sphere
             f.write("/gps/ang/type cos \n")
             f.write("/gps/ang/rot1 -1 0 0 \n")
             f.write("/gps/ang/rot2 0 1 0 \n")
-            # f.write("/gps/ang/surfnorm true \n")
-            # f.write("/gps/ang/mintheta 0 deg \n")
-            # f.write("/gps/ang/maxtheta 90 deg \n")
+            f.write("/gps/ang/mintheta 0 deg \n")
+            f.write("/gps/ang/maxtheta 90 deg \n")
 
         f.write("/gps/ene/type %s \n" % ene_type)
         if ene_type == "Mono":
@@ -279,7 +309,7 @@ def write_surface_macro(
         else:
             f.write("/gps/ene/min %.2f keV \n" % ene_min_keV)
             f.write("/gps/ene/max %.2f keV \n" % ene_max_keV)
-        
+
         # get a progress bar
         f.write("/run/printProgress %d \n" % int(progress_mod))
         f.write("/run/beamOn %d \n" % int(n_particles))
