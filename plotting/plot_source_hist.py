@@ -5,7 +5,7 @@ import sys
 from plot_geant_histograms import *
 
 histo_dir = "/home/rileyannereid/workspace/geant4/simulation-data/histo"
-fname_tag = f"11-None-nosurf-pinhole"
+fname_tag = f"61-2-10p72-deg-d2-4p5"
 # removing the new line characters
 histos = []
 for i, k in zip(

@@ -242,9 +242,9 @@ def write_surface_macro(
         if ring:
             f.write("/gps/pos/type Plane \n")
             f.write("/gps/pos/shape Square \n")
-            f.write("/gps/pos/halfx 4.64 cm \n")
-            f.write("/gps/pos/halfy 4.64 cm \n")  # 3.72066
-            f.write(f"/gps/pos/centre 0 0 {ca_pos-3} cm \n")
+            f.write("/gps/pos/halfx 5.3 cm \n")
+            f.write("/gps/pos/halfy 5.3 cm \n")  # 3.72066
+            f.write(f"/gps/pos/centre 0 0 {ca_pos-4} cm \n")
         else:
             f.write("/gps/pos/type Surface \n")
             f.write("/gps/pos/shape Sphere \n")

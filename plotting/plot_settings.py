@@ -1,3 +1,4 @@
+import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import numpy as np
 import matplotlib.ticker
@@ -68,8 +69,20 @@ hex_list = [
 # hex_list = ["#023047","#219EBC","#FFB703","#FB8500","#F15025"]
 hex_list = ["#264653", "#2a9d8f", "#e9c46a", "#f4a261", "#e76f51"]
 hex_list = ["#ffbe0b", "#fb5607", "#ff006e", "#8338ec", "#3a86ff"]
-hex_list = ['#05668d', '#028090', '#00a896', '#02c39a', '#f0f3bd']
-hex_list = ["#264653","#2a9d8f","#e9c46a","#f4a261","#e76f51"]
+hex_list = ["#05668d", "#028090", "#00a896", "#02c39a", "#f0f3bd"]
+hex_list = ["#264653", "#2a9d8f", "#e9c46a", "#f4a261", "#e76f51"]
+hex_list = [
+    "#001219",
+    "#005f73",
+    "#0a9396",
+    "#94d2bd",
+    "#e9d8a6",
+    "#ee9b00",
+    "#ca6702",
+    "#bb3e03",
+    "#ae2012",
+    "#9b2226",
+]
 cmap = get_continuous_cmap(hex_list)
 
 hex_colors = []
@@ -77,3 +90,18 @@ for i in range(cmap.N):
     rgba = cmap(i)
     # rgb2hex accepts rgb or rgba
     hex_colors.append(mcolors.rgb2hex(rgba))
+
+"""
+# Set default parameters for plots
+plt.rcParams["axes.facecolor"] = "white"  # Background color to transparent
+
+# Set default text and title color to white
+plt.rcParams["text.color"] = "white"
+plt.rcParams["axes.labelcolor"] = "white"
+plt.rcParams["xtick.color"] = "white"
+plt.rcParams["ytick.color"] = "white"
+plt.rcParams["axes.titlecolor"] = "white"
+
+# Set default grid color to white
+plt.rcParams["grid.color"] = "white"
+"""

@@ -399,53 +399,14 @@ class Hits:
         return
 
     def exclude_pcfov(
-        self, detector_dim, mask_dim, focal_length, plane_distance, second_axis
+        self, detector_dim, mask_dim, focal_length, plane_distance, second_axis,sphere_radius
     ):
-        # create locations for sensor corners and mask corners
+        # calculate anlge between origin and the hit on the detector
+        count = 0
+        inside_idx = []
 
-        if second_axis == "z":
-            pixel0 = np.array([detector_dim / 2, -1 * focal_length, detector_dim / 2])
-            mask0 = np.array([mask_dim / 2, 0, mask_dim / 2])
-
-            pixel1 = np.array(
-                [-1 * detector_dim / 2, -1 * focal_length, detector_dim / 2]
-            )
-            mask1 = np.array([-1 * mask_dim / 2, 0, mask_dim / 2])
-
-            pixel2 = np.array(
-                [detector_dim / 2, -1 * focal_length, -1 * detector_dim / 2]
-            )
-            mask2 = np.array([mask_dim / 2, 0, -1 * mask_dim / 2])
-
-            pixel3 = np.array(
-                [-1 * detector_dim / 2, -1 * focal_length, -1 * detector_dim / 2]
-            )
-            mask3 = np.array([-1 * mask_dim / 2, 0, -1 * mask_dim / 2])
-        else:
-            pixel0 = np.array(
-                [
-                    detector_dim / 2,
-                    detector_dim / 2,
-                    0,
-                ]
-            )
-            mask0 = np.array([mask_dim / 2, mask_dim / 2, -1 * focal_length])
-
-            pixel1 = np.array([-1 * detector_dim / 2, detector_dim / 2, 0])
-            mask1 = np.array([-1 * mask_dim / 2, mask_dim / 2, -1 * focal_length])
-
-            pixel2 = np.array([detector_dim / 2, -1 * detector_dim / 2, 0])
-            mask2 = np.array([mask_dim / 2, -1 * mask_dim / 2, -1 * focal_length])
-
-            pixel3 = np.array([-1 * detector_dim / 2, -1 * detector_dim / 2, 0])
-            mask3 = np.array([-1 * mask_dim / 2, -1 * mask_dim / 2, -1 * focal_length])
-        # Calculate the vector from point1 to point2
-        vector0 = pixel0 - mask0
-        vector1 = pixel1 - mask1
-        vector2 = pixel2 - mask2
-        vector3 = pixel3 - mask3
-
-        ray_directions = [vector0, vector1, vector2, vector3]
+        import matplotlib.pyplot as plt
+        plot=False
 
         def ray_sphere_intersection(
             ray_origin, ray_direction, sphere_center, sphere_radius
@@ -476,6 +437,110 @@ class Hits:
 
             return intersection_point
 
+        # center is at 0,0,0 where the imaginary plane is
+        mask0 = np.array([mask_dim / 2, mask_dim / 2, -1 * (plane_distance + focal_length)])
+        mask1 = np.array([-1 * mask_dim / 2, mask_dim / 2,  -1 * (plane_distance + focal_length)])
+        mask2 = np.array([mask_dim / 2, -1 * mask_dim / 2,  -1 * (plane_distance + focal_length)])
+        mask3 = np.array([-1 * mask_dim / 2, -1 * mask_dim / 2,  -1 * (plane_distance + focal_length)])
+        sphere_center = np.array([0,0,0])
+
+        # Calculate the vector from point1 to point2
+        vector0 = mask0 - sphere_center
+        vector1 = mask1 - sphere_center
+        vector2 = mask2 - sphere_center
+        vector3 = mask3 - sphere_center
+
+        ray_directions = [vector0, vector1, vector2, vector3] 
+
+        intersection_points = []
+        for vector in ray_directions:
+            # ray origin is from sphere center
+            ray_origin = sphere_center
+            vector /= np.linalg.norm(vector)
+            
+            # Calculate the intersection point on the surface of the sphere
+            intersection_point = ray_sphere_intersection(
+                ray_origin, vector, sphere_center, sphere_radius
+            )
+            intersection_points.append(intersection_point)
+
+        # now we go through each input and check if its inside the square
+        x1 = min([itp[0] for itp in intersection_points])
+        x2 = max([itp[0] for itp in intersection_points])
+        y1 = min([itp[1] for itp in intersection_points])
+        y2 = max([itp[1] for itp in intersection_points])
+
+        for vi, vtx in enumerate(self.hits_dict["Vertices"]):
+            if (x1 < vtx[0] and vtx[0] < x2) and (y1 < vtx[1] and vtx[1] < y2):
+                inside_idx.append(vi)
+                if plot:
+                    plt.scatter(vtx[0], vtx[1], color="blue")
+            else:
+                count += 1
+                if plot:
+                    plt.scatter(vtx[0], vtx[1], color="red")
+                    
+        inside_hits = {}
+        # save only those inside
+        for key, array in self.hits_dict.items():
+            inside_hits[key] = [array[i] for i in inside_idx]
+
+        self.hits_dict = inside_hits
+        if plot:
+            plt.show()
+
+        print("removed ", count, "hits")
+        """
+
+
+        focal_length = focal_length*-1
+        # create locations for sensor corners and mask corners
+
+        if second_axis == "z":
+            pixel0 = np.array([detector_dim / 2, -1 * focal_length, detector_dim / 2])
+            mask0 = np.array([mask_dim / 2, 0, mask_dim / 2])
+
+            pixel1 = np.array(
+                [-1 * detector_dim / 2, -1 * focal_length, detector_dim / 2]
+            )
+            mask1 = np.array([-1 * mask_dim / 2, 0, mask_dim / 2])
+
+            pixel2 = np.array(
+                [detector_dim / 2, -1 * focal_length, -1 * detector_dim / 2]
+            )
+            mask2 = np.array([mask_dim / 2, 0, -1 * mask_dim / 2])
+
+            pixel3 = np.array(
+                [-1 * detector_dim / 2, -1 * focal_length, -1 * detector_dim / 2]
+            )
+            mask3 = np.array([-1 * mask_dim / 2, 0, -1 * mask_dim / 2])
+        else:
+            pixel0 = np.array(
+                [
+                    detector_dim / 2,
+                    detector_dim / 2,
+                    -1 * focal_length,
+                ]
+            )
+            mask0 = np.array([mask_dim / 2, mask_dim / 2, 0])
+
+            pixel1 = np.array([-1 * detector_dim / 2, detector_dim / 2, -1 * focal_length])
+            mask1 = np.array([-1 * mask_dim / 2, mask_dim / 2, 0])
+
+            pixel2 = np.array([detector_dim / 2, -1 * detector_dim / 2, -1 * focal_length])
+            mask2 = np.array([mask_dim / 2, -1 * mask_dim / 2, 0])
+
+            pixel3 = np.array([-1 * detector_dim / 2, -1 * detector_dim / 2, -1 * focal_length])
+            mask3 = np.array([-1 * mask_dim / 2, -1 * mask_dim / 2, 0])
+        # Calculate the vector from point1 to point2
+        vector0 = mask0 - pixel0
+        vector1 = mask1 - pixel1
+        vector2 = mask2 - pixel2
+        vector3 = mask3 - pixel3
+
+        ray_directions = [vector0, vector1, vector2, vector3]
+
+
         def ray_plane_intersection(ray_origin, ray_direction, plane_distance):
             P0 = np.array([0, 0, -1 * plane_distance])
             N = np.array([0, 0, 1])
@@ -497,21 +562,8 @@ class Hits:
         pixels = [pixel0, pixel1, pixel2, pixel3]
         vectors = [vector0, vector1, vector2, vector3]
 
-        intersection_points = []
-        for vector in vectors:
-            # ray origin is from sphere center
-            ray_origin = np.array([0, 0, 0])
-            vector /= np.linalg.norm(vector)
-            ray_direction = vector
 
-            # Define the sphere's center and radius
-            # sphere_center = np.array([0.0, 0.0, 0.0])
-
-            # Calculate the intersection point on the surface of the sphere
-            intersection_point = ray_plane_intersection(
-                ray_origin, ray_direction, plane_distance
-            )
-            intersection_points.append(intersection_point)
+        
         # check if the point lies on the 2D polygon formed
         polygon_coords = [(itp[0], itp[1]) for itp in intersection_points]
         polygon_coords.append((intersection_points[0][0], intersection_points[0][1]))
@@ -533,10 +585,14 @@ class Hits:
             inside_hits[key] = [array[i] for i in inside_idx]
 
         self.hits_dict = inside_hits
-        """
+        
         # find the theta and phi extent from the intersection points
         theta_extents = []
         phi_extents = []
+        # plotting
+        import matplotlib.pyplot as plt
+        fig = plt.figure(figsize=(8, 8))
+        ax = fig.add_subplot(111, projection='3d')
 
         for itp in intersection_points:
             x = itp[0]
@@ -549,15 +605,34 @@ class Hits:
 
             theta_extents.append(theta)
             phi_extents.append(phi)
+            ax.scatter(x,y,z,color='black')
 
         # unpack into extents
         theta_min = min(np.array(theta_extents))
         theta_max = max(np.array(theta_extents))
         phi_min = min(np.array(phi_extents))
         phi_max = max(np.array(phi_extents))
+        print(theta_max)
 
         inside_idx = []
+
+
+        radius = 7
+        u = np.linspace(0, 2 * np.pi, 1000)
+        v = np.linspace(0, np.pi, 1000)
+        x = radius * np.outer(np.cos(u), np.sin(v))
+        y = radius * np.outer(np.sin(u), np.sin(v))
+        z = radius * np.outer(np.ones(np.size(u)), np.cos(v))
+        ax.plot_surface(x, y, z, color='c', alpha=0.3)
+        origin = np.zeros(3)
+        scale = 10
+
+        for px,vector in zip(pixels,vectors):
+            vector /= np.linalg.norm(vector)
+            ax.plot([px[0],scale*vector[0]], [px[1],scale*vector[1]], [px[2],scale*vector[2]])
+
         # finally, go through hits and determine if within extents
+        theta_max = 0.583373
         for vi, vtx in enumerate(self.hits_dict["Vertices"]):
             # adjust for sphere center - TODO fix this to be dynamic!
             xc = 0
@@ -566,11 +641,11 @@ class Hits:
             x = vtx[0] - xc
             y = vtx[1] - yc
             z = vtx[2] - zc
-
+            
             # calculate in spherical
             r = math.sqrt(x**2 + y**2 + z**2)
             phi = math.atan2(y, x)
-            theta = math.acos(z / r)
+            theta = np.pi - math.acos(z / r)
 
             if second_axis == "z":
                 if theta < theta_max:
@@ -578,15 +653,41 @@ class Hits:
                 else:
                     pass
             else:
-                if theta_min < theta < theta_max and phi_min < phi < phi_max:
+                if theta < theta_max:
                     inside_idx.append(vi)
+                    ax.scatter(x,y,z,color="blue")
+
                 else:
-                    pass
+                    ax.scatter(x,y,z,color="red")
+                    #pass
         inside_hits = {}
         # save only those inside
         for key, array in self.hits_dict.items():
             inside_hits[key] = [array[i] for i in inside_idx]
 
         self.hits_dict = inside_hits
+
+        #plt.show()
         """
         return
+
+    def calc_angle(self):
+        detector_offset = 1111 * 0.45 - (0.03 / 2)  # TODO: make this dynamic
+        angles = []
+        for vi, (vtx, ptx) in enumerate(
+            zip(self.hits_dict["Vertices"], self.hits_dict["Position"])
+        ):
+            v_x = ptx[0] - vtx[0]
+            v_y = ptx[1] - vtx[1]
+            v_z = detector_offset - vtx[2]
+
+            angle = math.atan(abs(v_z) / math.sqrt(v_x**2 + v_y**2))
+
+            # Convert the angle from radians to degrees
+            angle_degrees = 90 - math.degrees(angle)
+            angles.append(angle_degrees)
+        mean_angle = np.mean(np.array(angles))
+        std = np.std(np.array(angles))
+
+        print("SOURCE RUN AT ", mean_angle, " WITH SPREAD", std)
+        return mean_angle, std

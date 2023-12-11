@@ -228,6 +228,7 @@ class SimulationEngine:
                     ca_pos=ca_pos,
                     confine=confine,
                     world_offset=self.world_offset,
+                    ring=ring,
                 )
             elif self.construct == "CA" and self.source == "PS" and surface == False:
                 macro_file = write_pt_macro(

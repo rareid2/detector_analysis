@@ -8,14 +8,20 @@ from typing import Tuple
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
 from mpl_toolkits.mplot3d import Axes3D
-from scipy.ndimage import zoom
-from scipy.signal import peak_widths, find_peaks
+from scipy import ndimage
+from scipy import interpolate
+from scipy.signal import peak_widths, find_peaks, convolve2d, correlate2d
 import scipy.optimize as opt
 from scipy.io import savemat
+from skimage import color, data, restoration
+import math
+import cv2
 import sys
+from pyfftw.interfaces import scipy_fftpack as fftw
 
 sys.path.insert(1, "../coded_aperture_mask_designs")
-from util_fncs import makeMURA, make_mosaic_MURA, get_decoder_MURA
+from util_fncs import makeMURA, make_mosaic_MURA, get_decoder_MURA, updated_get_decoder
+
 
 class Deconvolution:
     def __init__(
@@ -159,7 +165,7 @@ class Deconvolution:
         plt.colorbar(label=label)
         plt.xlabel("pixel")
         plt.ylabel("pixel")
-        plt.savefig(save_name, dpi=300)
+        plt.savefig(save_name, transparent=True, dpi=500)
         plt.close()
 
         return
@@ -193,7 +199,7 @@ class Deconvolution:
 
         return mask
 
-    def get_decoder(self) -> NDArray[np.uint16]:
+    def get_decoder(self, check, rotate, delta_decoding) -> NDArray[np.uint16]:
         """
         get decoding array
 
@@ -206,6 +212,7 @@ class Deconvolution:
             check = 1
         elif (
             self.mura_elements == 61
+            or self.mura_elements == 67
             or self.mura_elements == 31
             or self.mura_elements == 11
             or self.mura_elements == 7
@@ -213,16 +220,32 @@ class Deconvolution:
             check = 0
         else:
             check = 1
-        decoder = get_decoder_MURA(
-            self.mask, self.mura_elements, holes_inv=False, check=check
-        )
+        decoder = updated_get_decoder(self.mura_elements)
 
         # resample the decoding array to the correct resolution
         decoder = np.repeat(
-            decoder, self.resample_n_pixels // self.mura_elements, axis=1
-        ).repeat(self.resample_n_pixels // self.mura_elements, axis=0)
+            np.repeat(decoder, self.resample_n_pixels // self.mura_elements, axis=1),
+            self.resample_n_pixels // self.mura_elements,
+            axis=0,
+        )
 
-        self.decoder = decoder
+        if delta_decoding:
+            print("delta")
+            decoder_zeros = np.zeros_like(decoder)
+            # now replace the middle elements
+            rows, cols = decoder.shape
+            for row in range(1, rows, 3):
+                for col in range(1, cols, 3):
+                    decoder_zeros[row, col] = decoder[row, col]
+            decoder = decoder_zeros
+
+        # mismatched
+        # decoder[decoder == -1] = 0
+
+        if rotate:
+            self.decoder = decoder * -1
+        else:
+            self.decoder = decoder
 
         return decoder
 
@@ -236,15 +259,16 @@ class Deconvolution:
         """
 
         # scipy.ndimage.zoom used here
-        resizedIm = zoom(self.rawIm, len(self.decoder) / len(self.rawIm))
+        # resizedIm = ndimage.zoom(self.rawIm, len(self.decoder) / len(self.rawIm))
+        resizedIm = np.rot90(self.rawIm)
 
         # Fourier space multiplication
         Image = np.real(
-            np.fft.ifft2(np.fft.fft2(resizedIm) * np.fft.fft2(self.decoder))
+            np.fft.ifft2(
+                np.fft.fft2(resizedIm)
+                * np.fft.fft2(np.flipud(np.fliplr((self.decoder))))
+            )
         )
-
-        # Set minimum value to 0
-        Image += np.abs(np.min(Image))
 
         # Shift to by half of image length after convolution
         deconvolved_image = shift(Image, len(self.decoder) // 2, len(self.decoder) // 2)
@@ -421,6 +445,10 @@ class Deconvolution:
         axis: int = 0,
         flat_field_array: NDArray = None,
         hits_txt: bool = False,
+        check: int = None,
+        rotate: bool = False,
+        correct_collimation: bool = False,
+        delta_decoding: bool = True,
     ) -> bool:
         """
         perform all the steps to deconvolve a raw image
@@ -462,22 +490,28 @@ class Deconvolution:
             np.savetxt(f"{save_raw_heatmap[:-3]}txt", self.raw_heatmap)
         elif hits_txt:
             self.raw_heatmap = self.hits_data
+
+        if correct_collimation:
+            self.correct_aperture_collimation(mask_thickness_um=400, focal_length_cm=2)
+
         if plot_raw_heatmap:
             self.plot_heatmap(self.raw_heatmap, save_name=save_raw_heatmap, vmax=vmax)
 
         # get mask and decoder
         self.get_mask(self.simulation_engine.mosaic)
-        self.get_decoder()
+        self.get_decoder(check, rotate, delta_decoding)
 
         # flip the heatmap over both axes bc point hole
-        rawIm = np.fliplr(self.raw_heatmap)
+        # rawIm = np.fliplr(self.raw_heatmap)
 
         # reflect bc correlation needs to equal convolution
-        rawIm = np.fliplr(rawIm)
-        self.rawIm = rawIm
+        # rawIm = np.fliplr(rawIm)
+        self.rawIm = self.raw_heatmap
 
         # deconvolve
         self.fft_conv()
+
+        # self.deconvolved_image = self.deconvolved_image / (67**2 * 3**2 * 0.5)
 
         if flat_field_array is not None:
             self.flat_field(flat_field_array)
@@ -537,7 +571,37 @@ class Deconvolution:
         """
         return
 
-    def plot_3D_signal(self, heatmap, heatmap2= None, save_name= None):
+    def anti_mask_signal(self, save_name=None):
+        self.anti_decoder = -1 * self.decoder
+
+        # scipy.ndimage.zoom used here
+        resizedIm = ndimage.zoom(self.rawIm, len(self.anti_decoder) / len(self.rawIm))
+        resizedIm = np.rot90(resizedIm)
+
+        # Fourier space multiplication
+        Image = np.real(
+            np.fft.ifft2(np.fft.fft2(resizedIm) * np.fft.fft2(self.anti_decoder))
+        )
+
+        # Set minimum value to 0
+        Image += np.abs(np.min(Image))
+
+        # Shift to by half of image length after convolution
+        anti_deconvolved_image = shift(
+            Image, len(self.anti_decoder) // 2, len(self.anti_decoder) // 2
+        )
+        self.anti_deconvolved_image = anti_deconvolved_image
+
+        self.plot_heatmap(anti_deconvolved_image, save_name=save_name)
+        return self.anti_deconvolved_image
+
+    def sum_signals(self, save_name=None):
+        summed_image = self.anti_deconvolved_image + self.deconvolved_image
+        self.summed_image = summed_image
+        self.plot_heatmap(summed_image, save_name=save_name)
+        return self.summed_image
+
+    def plot_3D_signal(self, heatmap, heatmap2=None, save_name=None):
         x = np.arange(heatmap.shape[0])
         y = np.arange(heatmap.shape[1])
         X, Y = np.meshgrid(x, y)
@@ -548,13 +612,9 @@ class Deconvolution:
         ax = fig.add_subplot(111, projection="3d")
 
         # Create the surface plot!
-        surface = ax.plot_surface(
-            X, Y, heatmap, cmap=cmap
-        )
+        surface = ax.plot_surface(X, Y, heatmap, cmap=cmap)
         if heatmap2 is not None:
-            surface = ax.plot_surface(
-                X, Y, heatmap2, color="r", alpha=0.2
-            )
+            surface = ax.plot_surface(X, Y, heatmap2, color="r", alpha=0.2)
 
         # Add a color bar for reference
         fig.colorbar(surface)
@@ -569,32 +629,35 @@ class Deconvolution:
         # plt.savefig(save_name, dpi=300)
 
     def calculate_fwhm(self, direction, max_index, scale):
-
         def gaussian2d(xy, xo, yo, sigma_x, sigma_y, amplitude, offset):
             xo = float(xo)
-            yo = float(yo)    
+            yo = float(yo)
             x, y = xy
-            gg = offset + amplitude*np.exp( - (((x-xo)**2)/(2*sigma_x**2) + ((y-yo)**2)/(2*sigma_y**2)))
+            gg = offset + amplitude * np.exp(
+                -(
+                    ((x - xo) ** 2) / (2 * sigma_x**2)
+                    + ((y - yo) ** 2) / (2 * sigma_y**2)
+                )
+            )
             return gg.ravel()
-
 
         def getFWHM_GaussianFitScaledAmp(img, direction):
             """Get FWHM(x,y) of a blob by 2D gaussian fitting
             Parameter:
                 img - image as numpy array
-            Returns: 
+            Returns:
                 FWHMs in pixels, along x and y axes.
             """
             x = np.linspace(0, img.shape[1], img.shape[1])
             y = np.linspace(0, img.shape[0], img.shape[0])
             x, y = np.meshgrid(x, y)
 
-            initial_guess = (img.shape[1]/2,img.shape[0]/2,2,2,1,0)
+            initial_guess = (img.shape[1] / 2, img.shape[0] / 2, 2, 2, 1, 0)
             params, _ = opt.curve_fit(gaussian2d, (x, y), img.ravel(), p0=initial_guess)
             xcenter, ycenter, sigmaX, sigmaY, amp, offset = params
 
-            FWHM_x = 2*sigmaX*np.sqrt(2*np.log(2))
-            FWHM_y = 2*sigmaY*np.sqrt(2*np.log(2))
+            FWHM_x = 2 * sigmaX * np.sqrt(2 * np.log(2))
+            FWHM_y = 2 * sigmaY * np.sqrt(2 * np.log(2))
 
             # return based on direction
             if direction == "x":
@@ -606,74 +669,179 @@ class Deconvolution:
                     fwhm = FWHM_x
                 else:
                     fwhm = FWHM_y
-            
+
             return fwhm, params
 
-        # get the shifted image and scale 
-        img = self.shifted_image / scale # this is the average signal over 0 after shifting for pt source centered
+        # get the shifted image and scale
+        img = (
+            self.shifted_image / scale
+        )  # this is the average signal over 0 after shifting for pt source centered
         import matplotlib.pyplot as plt
 
         sect = 10
 
         # get the section where the signal is
         img_bound = img.shape[0] - 1
-        if max_index[0] > img_bound-sect and max_index[1] < img_bound-sect:
-            img_clipped = img[max_index[0]-sect:, max_index[1]-sect:max_index[1]+sect+1]
+        if max_index[0] > img_bound - sect and max_index[1] < img_bound - sect:
+            img_clipped = img[
+                max_index[0] - sect :, max_index[1] - sect : max_index[1] + sect + 1
+            ]
 
             missing_rows = img_bound - max_index[0]
-            missing_signal = img[max_index[0]-sect:max_index[0]-missing_rows, max_index[1]-sect:max_index[1]+sect+1]
+            missing_signal = img[
+                max_index[0] - sect : max_index[0] - missing_rows,
+                max_index[1] - sect : max_index[1] + sect + 1,
+            ]
             flipped_pre_signal = missing_signal[::-1]
             img_clipped = np.vstack((img_clipped, flipped_pre_signal))
 
+        elif max_index[1] > img_bound - sect and max_index[0] < img_bound - sect:
+            img_clipped = img[
+                max_index[0] - sect : max_index[0] + sect + 1, max_index[1] - sect :
+            ]
 
-        elif max_index[1] > img_bound - sect and max_index[0] < img_bound-sect:
-            img_clipped = img[max_index[0]-sect:max_index[0]+sect+1, max_index[1]-sect:]
-            
             missing_cols = img_bound - max_index[1]
-            missing_signal = img[max_index[0]-sect:max_index[0]+sect+1, max_index[1]-sect:max_index[1]-missing_cols]
+            missing_signal = img[
+                max_index[0] - sect : max_index[0] + sect + 1,
+                max_index[1] - sect : max_index[1] - missing_cols,
+            ]
             flipped_pre_signal = missing_signal[:, ::-1]
             img_clipped = np.hstack((img_clipped, flipped_pre_signal))
 
+        elif max_index[0] > img_bound - sect and max_index[1] > img_bound - sect:
+            img_clipped = img[max_index[0] - sect :, max_index[1] - sect :]
 
-        elif max_index[0] > img_bound-sect and max_index[1] > img_bound-sect: 
-            img_clipped = img[max_index[0]-sect:,max_index[1]-sect:]
-            
             missing_rows = img_bound - max_index[0]
-            missing_signal = img[max_index[0]-sect:max_index[0]-missing_rows, max_index[1]-sect:]
+            missing_signal = img[
+                max_index[0] - sect : max_index[0] - missing_rows, max_index[1] - sect :
+            ]
             flipped_pre_signal = missing_signal[::-1]
             img_clipped = np.vstack((img_clipped, flipped_pre_signal))
 
             missing_cols = img_bound - max_index[1]
-            missing_signal = img_clipped[:, :(sect-missing_cols)]
+            missing_signal = img_clipped[:, : (sect - missing_cols)]
             flipped_pre_signal = missing_signal[:, ::-1]
             img_clipped = np.hstack((img_clipped, flipped_pre_signal))
 
         else:
-            img_clipped = img[max_index[0]-sect:max_index[0]+sect+1,max_index[1]-sect:max_index[1]+sect+1]
+            img_clipped = img[
+                max_index[0] - sect : max_index[0] + sect + 1,
+                max_index[1] - sect : max_index[1] + sect + 1,
+            ]
 
-        FWHM, params = getFWHM_GaussianFitScaledAmp(img_clipped, direction) 
+        FWHM, params = getFWHM_GaussianFitScaledAmp(img_clipped, direction)
 
         # for plotting if interested
         xcenter, ycenter, sigmaX, sigmaY, amp, offset = params
         x = np.linspace(0, img_clipped.shape[1], 1000)
         y = np.linspace(0, img_clipped.shape[0], 1000)
         x, y = np.meshgrid(x, y)
-        g2d = offset + amp*np.exp( - (((x-xcenter)**2)/(2*sigmaX**2) + ((y-ycenter)**2)/(2*sigmaY**2)))
+        g2d = offset + amp * np.exp(
+            -(
+                ((x - xcenter) ** 2) / (2 * sigmaX**2)
+                + ((y - ycenter) ** 2) / (2 * sigmaY**2)
+            )
+        )
 
-        #self.plot_3D_signal(img_clipped)
+        # self.plot_3D_signal(img_clipped)
 
         return FWHM
+
+    def correct_aperture_collimation(self, mask_thickness_um, focal_length_cm):
+        # collimation correction is a function of radial distance
+        element_size_cm = self.element_size_mm * 0.1
+        center_element = self.n_elements // 2
+
+        # build the aperture collimation map - in terms of mak elements
+        aperture_collimation = np.zeros((self.n_elements, self.n_elements))
+        for x in range(self.n_elements):
+            for y in range(self.n_elements):
+                relative_x = (x - center_element) * element_size_cm
+                relative_y = (y - center_element) * element_size_cm
+                # calculate radial distance
+                r = np.sqrt(relative_x**2 + relative_y**2)
+                # solve for d
+                d = mask_thickness_um * 1e-4 * (r / focal_length_cm)
+
+                # solve for collimation factor
+                c = 1 - (d / element_size_cm)
+                aperture_collimation[x, y] = c
+
+        aperture_collimation = np.real(
+            np.fft.ifft2(
+                np.fft.fft2(aperture_collimation)
+                * np.fft.fft2(self.get_mask(mosaic=True))
+            )
+        )
+        aperture_collimation = shift(
+            aperture_collimation,
+            len(self.get_mask(mosaic=True)) // 2,
+            len(self.get_mask(mosaic=True)) // 2,
+        )
+
+        X, Y = np.meshgrid(
+            np.arange(self.n_elements), np.arange(self.n_elements)
+        )  # Creating a grid
+
+        # Define new grid coordinates
+        new_x = np.linspace(0, self.mura_elements - 1, self.mura_elements * 2)
+        new_y = np.linspace(0, self.mura_elements - 1, self.mura_elements * 2)
+
+        new_X, new_Y = np.meshgrid(new_x, new_y)  # New grid
+
+        # Resample the grid using griddata
+        new_Z = interpolate.griddata(
+            (X.flatten(), Y.flatten()),
+            aperture_collimation.flatten(),
+            (new_X, new_Y),
+            method="cubic",
+        )
+        # Perform the interpolation to upsample the grid
+        upsampled_grid = new_Z
+        plt.clf()
+        plt.imshow(aperture_collimation, cmap=cmap)
+        plt.colorbar()
+        plt.savefig(
+            "/home/rileyannereid/workspace/geant4/simulation-results/rings/aperture_collimation.png"
+        )
+        plt.clf()
+
+        # now correct the image
+        self.raw_heatmap = np.divide(self.raw_heatmap[:-1, :-1], aperture_collimation)
 
     def shift_noise_floor_ptsrc(self, row, col):
         # shift the image down to the noise floor
         # exclude the banding artifacts
         noise_floor = np.ones_like(self.deconvolved_image, dtype=bool)
-        noise_floor[row-1:row+2, :] = False
-        noise_floor[:, col-1:col+2] = False
+        noise_floor[row - 1 : row + 2, :] = False
+        noise_floor[:, col - 1 : col + 2] = False
         average_noise = np.mean(self.deconvolved_image[noise_floor])
 
         self.shifted_image = self.deconvolved_image - average_noise
         return self.shifted_image
+
+    def lucy_richardson(self, save_name):
+        # grab the middle of the mask pattern if mosiacked
+
+        lr_mask = self.mask[
+            self.mura_elements // 2 : (self.mura_elements // 2) + self.mura_elements,
+            self.mura_elements // 2 : (self.mura_elements // 2) + self.mura_elements,
+        ]
+        lr_mask = np.repeat(
+            np.repeat(lr_mask, self.resample_n_pixels // self.mura_elements, axis=1),
+            self.resample_n_pixels // self.mura_elements,
+            axis=0,
+        )
+        self.lr_mask = lr_mask
+
+        psf = convolve2d(self.decoder, lr_mask, "same")
+        lr_image = restoration.richardson_lucy(
+            self.deconvolved_image, -1 * psf, num_iter=1
+        )
+
+        self.lr_image = lr_image
+
+        self.plot_heatmap(lr_image, save_name)
 
     def reverse_raytrace(self):
         # attempt to reverse ray trace each pixel through each coded aperture hole
@@ -756,10 +924,10 @@ class Deconvolution:
         plt.savefig("test.png")
         return mx, my
 
-    def export_to_matlab(self, openelements):
+    def export_to_matlab(self, openelements=None):
         # Define a dictionary to store the grid
-        no_mosaic_mask = self.get_mask(False)
-        no_mosaic_decoder = self.dd
+        no_mosaic_mask = self.lr_mask
+        no_mosaic_decoder = self.decoder
         data = {"mask": no_mosaic_mask}
 
         # Specify the file path where you want to save the .mat file
@@ -786,13 +954,13 @@ class Deconvolution:
         # Save the grid data as a .mat file
         savemat(file_path, data)
 
-        data = {"openElements": openelements}
+        # data = {"openElements": openelements}
 
         # Specify the file path where you want to save the .mat file
-        file_path = "open_elements.mat"
+        # file_path = "open_elements.mat"
 
         # Save the grid data as a .mat file
-        savemat(file_path, data)
+        # savemat(file_path, data)
 
         return
 

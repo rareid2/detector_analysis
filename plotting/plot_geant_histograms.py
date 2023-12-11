@@ -1026,6 +1026,7 @@ def plot_single_2d(histo, ax=None, fname="test"):
         plt.ylabel(histo["yaxistit"])
     if "title" in histo:
         plt.title(histo["title"])
+    plt.ylim([8,14])
 
     plt.subplots_adjust(wspace=0.4, hspace=0.8)
     print("finished plotting")
