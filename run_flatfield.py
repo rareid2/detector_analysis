@@ -12,20 +12,40 @@ import os
 # source = DS and PS
 
 
-def run_geom_corr(ind, direction, i, results_folder, vmax=None, simulate=False, txt=True, hitsonly=False, scale=None):
+def run_geom_corr(
+    ind,
+    direction,
+    i,
+    results_folder,
+    vmax=None,
+    simulate=False,
+    txt=True,
+    hitsonly=False,
+    scale=None,
+    data_folder=None,
+):
+    if data_folder is None:
+        data_folder = results_folder
 
-    simulation_engine = SimulationEngine(construct="CA", source="PS", write_files=False)
+    if simulate:
+        simulation_engine = SimulationEngine(
+            construct="CA", source="PS", write_files=True
+        )
+    else:
+        simulation_engine = SimulationEngine(
+            construct="CA", source="PS", write_files=False
+        )
 
     # general detector design
-    det_size_cm = 3.05  # cm
-    pixel = 0.25  # mm
-    pixel_cm = 0.025
+    det_size_cm = 2.68  # cm
+    pixel = 0.133333333333  # mm
+    pixel_cm = pixel * 0.1  # cm
 
     # ---------- coded aperture set up ---------
 
     # set number of elements
-    n_elements_original = 61
-    multiplier = 2
+    n_elements_original = 67
+    multiplier = int(0.4 / pixel)
 
     element_size = pixel * multiplier
     n_elements = (2 * n_elements_original) - 1
@@ -86,7 +106,10 @@ def run_geom_corr(ind, direction, i, results_folder, vmax=None, simulate=False, 
     # now we have location of the src_point
 
     # ------------------- simulation parameters ------------------
-    n_particles = 1e6
+    if hitsonly:
+        n_particles = 1e5
+    else:
+        n_particles = 1e6
 
     # --------------set up simulation---------------
     simulation_engine.set_config(
@@ -112,11 +135,11 @@ def run_geom_corr(ind, direction, i, results_folder, vmax=None, simulate=False, 
         fname_tag = f"hitsonly-{n_elements_original}-{distance}-{ind}-{direction}-{i}_{n_particles:.2E}_{energy_type}_{energy_level}"
     else:
         fname_tag = f"{n_elements_original}-{distance}-{ind}-{direction}-{i}_{n_particles:.2E}_{energy_type}_{energy_level}"
-    
+
     if txt:
         fname = f"{results_folder}{fname_tag}_raw.txt"
     else:
-        fname = f"{results_folder}{fname_tag}.csv"
+        fname = f"{data_folder}{fname_tag}.csv"
 
     simulation_engine.set_macro(
         n_particles=int(n_particles),
@@ -134,7 +157,7 @@ def run_geom_corr(ind, direction, i, results_folder, vmax=None, simulate=False, 
     results_save = f"{results_folder}{fname_tag}"
 
     if simulate and not hitsonly:
-        simulation_engine.run_simulation(fname, build=True, rename=True)
+        simulation_engine.run_simulation(fname, build=False, rename=True)
 
         # get the raw hits
         myhits = Hits(fname=fname, experiment=False)
@@ -155,7 +178,8 @@ def run_geom_corr(ind, direction, i, results_folder, vmax=None, simulate=False, 
             save_deconvolve_heatmap=results_save + "_dc.png",
             plot_signal_peak=False,
             plot_conditions=False,
-            hits_txt=False
+            hits_txt=False,
+            delta_decoding=False,
         )
     elif txt and not hitsonly:
         # dont simulate, process the txt file
@@ -168,40 +192,51 @@ def run_geom_corr(ind, direction, i, results_folder, vmax=None, simulate=False, 
             downsample=int(multiplier * n_elements_original),
             trim=trim,
             vmax=vmax,
-            plot_deconvolved_heatmap=True,
-            plot_raw_heatmap=True,
+            plot_deconvolved_heatmap=False,
+            plot_raw_heatmap=False,
             save_raw_heatmap=results_save + "_raw.png",
             save_deconvolve_heatmap=results_save + "_dc.png",
             plot_signal_peak=False,
             plot_conditions=False,
-            hits_txt=True
+            hits_txt=True,
+            delta_decoding=False,
         )
     else:
-        # dont process anything, only getting raw hits
+        # only getting raw hits
+        if simulate:
+            simulation_engine.run_simulation(fname, build=False, rename=True)
+            myhits = Hits(fname=fname, experiment=False)
+            myhits.get_det_hits(
+                remove_secondaries=True, second_axis="y", energy_level=energy_level
+            )
+            hits_len = len(myhits.hits_dict["Position"])
         if txt:
             myhits = Hits(fname=fname, experiment=False, txt_file=True)
             hits_len = np.sum(np.loadtxt(fname))
         else:
             myhits = Hits(fname=fname, experiment=False)
             myhits.get_det_hits(
-                remove_secondaries=True, second_axis="y", energy_level=energy_level)
+                remove_secondaries=True, second_axis="y", energy_level=energy_level
+            )
             hits_len = len(myhits.hits_dict["Position"])
 
     if not hitsonly:
         # find the max index
         max_index_flat = np.argmax(deconvolver.deconvolved_image)
-        max_index_2d = np.unravel_index(max_index_flat, deconvolver.deconvolved_image.shape)
+        max_index_2d = np.unravel_index(
+            max_index_flat, deconvolver.deconvolved_image.shape
+        )
 
         # shift up to the noise floor so that the noise floor is at 0
         deconvolver.shift_noise_floor_ptsrc(max_index_2d[0], max_index_2d[1])
         max_signal = deconvolver.shifted_image[max_index_2d]
-        
+
         if scale is None:
             scale = max_signal
-        fwhm = deconvolver.calculate_fwhm(direction, max_index_2d, scale = scale)
-        
-        #print("Indices of the maximum value (2D):", max_index_2d)
-        
+        fwhm = deconvolver.calculate_fwhm(direction, max_index_2d, scale=scale)
+
+        # print("Indices of the maximum value (2D):", max_index_2d)
+
     else:
         max_signal = None
         fwhm = None
@@ -209,48 +244,69 @@ def run_geom_corr(ind, direction, i, results_folder, vmax=None, simulate=False, 
     return max_signal, fwhm, hits_len
 
 
-# -------- ------- SETUP -------- ------- 
-results_folder = "/Users/rileyannereid/Code/detector_analysis/results/61-2-400/"
-maxpixel = 60
-pix_int = 4
-incs = range(pix_int, maxpixel + pix_int, pix_int)
-niter = 20
+# -------- ------- SETUP -------- -------
+results_folder = (
+    "/home/rileyannereid/workspace/geant4/simulation-results/67-2-fwhm-delta/"
+)
+data_folder = "/home/rileyannereid/workspace/geant4/simulation-data/67-2-fwhm-delta/"
+maxpixel = 101
+pix_int = 6
+incs = range(pix_int, maxpixel, pix_int)
+niter = 8
 
 # -------- -------STEP 1 : need to get the raw hits (shielding stays, but no mask) -------- -------
 # need to comment out the physical mask vols in detector construction
-step1 = True
+step1 = False
 simulate = False
-txt = False
+txt = True
 hitsonly = True
 
 if step1:
-    for direction in ["0","x","y","xy"]:
+    for direction in ["0", "x", "y", "xy"]:
         allhits = []
         if direction != "0":
             for inc in incs:
                 avg_hits = 0
                 for i in range(niter):
-                    _, _, nhits = run_geom_corr(inc, direction, i, results_folder, simulate=simulate, txt=txt, hitonly=hitsonly)
+                    _, _, nhits = run_geom_corr(
+                        inc,
+                        direction,
+                        i,
+                        results_folder,
+                        simulate=simulate,
+                        txt=txt,
+                        hitsonly=hitsonly,
+                        data_folder=data_folder,
+                    )
                     avg_hits += nhits
                 allhits.append(avg_hits / niter)
             np.savetxt(
-                    f"{results_folder}{direction}-hits.txt",
-                    np.array(allhits),
-                    delimiter=", ",
-                    fmt="%.14f",
-                )
+                f"{results_folder}{direction}-hits.txt",
+                np.array(allhits),
+                delimiter=", ",
+                fmt="%.14f",
+            )
         else:
             avg_hits = 0
             for i in range(niter):
-                _, _, nhits = run_geom_corr(0, direction, i, results_folder, simulate=simulate, txt=txt, hitonly=hitsonly)
+                _, _, nhits = run_geom_corr(
+                    0,
+                    direction,
+                    i,
+                    data_folder,
+                    simulate=simulate,
+                    txt=txt,
+                    hitsonly=hitsonly,
+                    data_folder=data_folder,
+                )
                 avg_hits += nhits
-            center_hits = avg_hits/niter
+            center_hits = avg_hits / niter
             np.savetxt(
-                    f"{results_folder}{direction}-hits.txt",
-                    np.array([center_hits]),
-                    delimiter=", ",
-                    fmt="%.14f",
-                )       
+                f"{results_folder}{direction}-hits.txt",
+                np.array([center_hits]),
+                delimiter=", ",
+                fmt="%.14f",
+            )
 
 # -------- ------- STEP 2 : get the deconvolved image with the mask to get the FWHM and signal -------- -------
 step2 = True
@@ -259,61 +315,95 @@ txt = True
 hitsonly = False
 
 scale = None
+center_hits = None
+include_hits_effect = True
 
 if step2:
-    for direction in ["0","xy"]:
+    for direction in ["0", "x", "y", "xy"]:
         fwhms = []
         signals = []
         if direction != "0":
-            for inc in incs:
+            if include_hits_effect:
+                hits = np.loadtxt(f"{results_folder}{direction}-hits.txt")
+            for ii, inc in enumerate(incs):
                 print(inc)
+
+                if include_hits_effect:
+                    hit_norm = hits[ii] / center_hits
+                else:
+                    hit_norm = 1
+
                 avg_fwhm = 0
                 avg_signal = 0
                 for i in range(niter):
-                    signal, fwhm, _ = run_geom_corr(inc, direction, i, results_folder, simulate=simulate, txt=txt, hitsonly=hitsonly, scale=scale)
+                    signal, fwhm, _ = run_geom_corr(
+                        inc,
+                        direction,
+                        i,
+                        results_folder,
+                        simulate=simulate,
+                        txt=txt,
+                        hitsonly=hitsonly,
+                        scale=(scale * hit_norm),
+                        data_folder=data_folder,
+                    )
                     avg_fwhm += fwhm
                     avg_signal += signal
+
                 fwhms.append(avg_fwhm / niter)
                 signals.append(avg_signal / niter)
             # save results
             np.savetxt(
-                    f"{results_folder}{direction}-fwhm.txt",
-                    np.array(fwhms),
-                    delimiter=", ",
-                    fmt="%.14f",
-                )
+                f"{results_folder}{direction}-fwhm.txt",
+                np.array(fwhms),
+                delimiter=", ",
+                fmt="%.14f",
+            )
             np.savetxt(
-                    f"{results_folder}{direction}-signal.txt",
-                    np.array(signals),
-                    delimiter=", ",
-                    fmt="%.14f",
-                )
+                f"{results_folder}{direction}-signal.txt",
+                np.array(signals),
+                delimiter=", ",
+                fmt="%.14f",
+            )
             print("processed hits for direction ", direction)
-        
+
         else:
             fwhm_norm = 0
             max_signal_norm = 0
             for i in range(niter):
-                max_signal, fwhm, _ = run_geom_corr(0, direction, i, results_folder, simulate=simulate, txt=txt, hitsonly=hitsonly, scale=scale)
-                
+                max_signal, fwhm, _ = run_geom_corr(
+                    0,
+                    direction,
+                    i,
+                    results_folder,
+                    simulate=simulate,
+                    txt=txt,
+                    hitsonly=hitsonly,
+                    scale=scale,
+                    data_folder=data_folder,
+                )
+
                 fwhm_norm += fwhm
                 max_signal_norm += max_signal
 
-            avg_fwhm_norm = fwhm_norm / niter  
+            avg_fwhm_norm = fwhm_norm / niter
             avg_max_signal_norm = max_signal_norm / niter
 
             scale = avg_max_signal_norm
 
             np.savetxt(
-                        f"{results_folder}{direction}-fwhm.txt",
-                        np.array([avg_fwhm_norm]),
-                        delimiter=", ",
-                        fmt="%.14f",
-                    )   
+                f"{results_folder}{direction}-fwhm.txt",
+                np.array([avg_fwhm_norm]),
+                delimiter=", ",
+                fmt="%.14f",
+            )
             np.savetxt(
-                        f"{results_folder}{direction}-signal.txt",
-                        np.array([avg_max_signal_norm]),
-                        delimiter=", ",
-                        fmt="%.14f",
-                    )     
+                f"{results_folder}{direction}-signal.txt",
+                np.array([avg_max_signal_norm]),
+                delimiter=", ",
+                fmt="%.14f",
+            )
             print("processed center hits with scale ", scale)
+
+            if include_hits_effect:
+                center_hits = np.loadtxt(f"{results_folder}{direction}-hits.txt")
