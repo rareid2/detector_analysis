@@ -15,6 +15,8 @@ class Hits:
         experiment_engine: ExperimentEngine = None,
         file_count: int = 0,
         txt_file: bool = False,
+        #nlines: int = 10000,
+        #nstart: int = 10000,
     ) -> None:
         # filename containing hits data
         self.fname = fname
@@ -111,6 +113,8 @@ class Hits:
                 delimiter=",",
                 on_bad_lines="skip",
                 engine="c",
+                #nrows=nlines,
+                #skiprows=range(1, nstart + 1),
             )
 
             self.n_entries = len(self.detector_hits["det"])
@@ -227,7 +231,9 @@ class Hits:
                 zpos = self.detector_hits["z"][count]
                 energy_keV = self.detector_hits["energy"][count]
 
-                if second_axis == "z" and ypos == 0.015 and energy_keV == energy_level:
+                if (
+                    second_axis == "z" and ypos == 0.015
+                ):  # and energy_keV == energy_level:
                     posX.append(xpos)
                     posY.append(zpos - detector_offset)
                     energies.append(energy_keV)
@@ -243,7 +249,7 @@ class Hits:
                 elif (
                     second_axis == "y"
                     and zpos == detector_offset
-                    and energy_keV == energy_level
+                    # and energy_keV == energy_level
                 ):
                     posX.append(xpos)
                     posY.append(ypos)
@@ -399,14 +405,21 @@ class Hits:
         return
 
     def exclude_pcfov(
-        self, detector_dim, mask_dim, focal_length, plane_distance, second_axis,sphere_radius
+        self,
+        detector_dim,
+        mask_dim,
+        focal_length,
+        plane_distance,
+        second_axis,
+        sphere_radius,
     ):
         # calculate anlge between origin and the hit on the detector
         count = 0
         inside_idx = []
 
         import matplotlib.pyplot as plt
-        plot=False
+
+        plot = False
 
         def ray_sphere_intersection(
             ray_origin, ray_direction, sphere_center, sphere_radius
@@ -438,11 +451,19 @@ class Hits:
             return intersection_point
 
         # center is at 0,0,0 where the imaginary plane is
-        mask0 = np.array([mask_dim / 2, mask_dim / 2, -1 * (plane_distance + focal_length)])
-        mask1 = np.array([-1 * mask_dim / 2, mask_dim / 2,  -1 * (plane_distance + focal_length)])
-        mask2 = np.array([mask_dim / 2, -1 * mask_dim / 2,  -1 * (plane_distance + focal_length)])
-        mask3 = np.array([-1 * mask_dim / 2, -1 * mask_dim / 2,  -1 * (plane_distance + focal_length)])
-        sphere_center = np.array([0,0,0])
+        mask0 = np.array(
+            [mask_dim / 2, mask_dim / 2, -1 * (plane_distance + focal_length)]
+        )
+        mask1 = np.array(
+            [-1 * mask_dim / 2, mask_dim / 2, -1 * (plane_distance + focal_length)]
+        )
+        mask2 = np.array(
+            [mask_dim / 2, -1 * mask_dim / 2, -1 * (plane_distance + focal_length)]
+        )
+        mask3 = np.array(
+            [-1 * mask_dim / 2, -1 * mask_dim / 2, -1 * (plane_distance + focal_length)]
+        )
+        sphere_center = np.array([0, 0, 0])
 
         # Calculate the vector from point1 to point2
         vector0 = mask0 - sphere_center
@@ -450,14 +471,14 @@ class Hits:
         vector2 = mask2 - sphere_center
         vector3 = mask3 - sphere_center
 
-        ray_directions = [vector0, vector1, vector2, vector3] 
+        ray_directions = [vector0, vector1, vector2, vector3]
 
         intersection_points = []
         for vector in ray_directions:
             # ray origin is from sphere center
             ray_origin = sphere_center
             vector /= np.linalg.norm(vector)
-            
+
             # Calculate the intersection point on the surface of the sphere
             intersection_point = ray_sphere_intersection(
                 ray_origin, vector, sphere_center, sphere_radius
@@ -479,7 +500,7 @@ class Hits:
                 count += 1
                 if plot:
                     plt.scatter(vtx[0], vtx[1], color="red")
-                    
+
         inside_hits = {}
         # save only those inside
         for key, array in self.hits_dict.items():
