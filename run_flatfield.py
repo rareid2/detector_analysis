@@ -37,17 +37,18 @@ def run_geom_corr(
         )
 
     # general detector design
-    det_size_cm = 2.68  # cm
-    pixel = 0.133333333333  # mm
+    det_size_cm = 2.82  # cm
+    pixel = 0.2  # mm
     pixel_cm = pixel * 0.1  # cm
 
     # ---------- coded aperture set up ---------
 
     # set number of elements
-    n_elements_original = 67
-    multiplier = int(0.4 / pixel)
+    n_elements_original = 47
+    multiplier = 3
 
     element_size = pixel * multiplier
+    print(element_size)
     n_elements = (2 * n_elements_original) - 1
 
     mask_size = element_size * n_elements
@@ -57,10 +58,10 @@ def run_geom_corr(
 
     # thickness of mask
     det_thickness = 300  # um
-    thickness = 400  # um
+    thickness = 1500  # um
 
     # focal length
-    distance = 2  # cm
+    distance = 2.2  # cm
 
     fake_radius = 1
 
@@ -179,7 +180,8 @@ def run_geom_corr(
             plot_signal_peak=False,
             plot_conditions=False,
             hits_txt=False,
-            delta_decoding=False,
+            delta_decoding=True,
+            rotate=True
         )
     elif txt and not hitsonly:
         # dont simulate, process the txt file
@@ -192,14 +194,15 @@ def run_geom_corr(
             downsample=int(multiplier * n_elements_original),
             trim=trim,
             vmax=vmax,
-            plot_deconvolved_heatmap=False,
+            plot_deconvolved_heatmap=True,
             plot_raw_heatmap=False,
             save_raw_heatmap=results_save + "_raw.png",
             save_deconvolve_heatmap=results_save + "_dc.png",
             plot_signal_peak=False,
             plot_conditions=False,
             hits_txt=True,
-            delta_decoding=False,
+            delta_decoding=True,
+            rotate=True
         )
     else:
         # only getting raw hits
@@ -228,12 +231,13 @@ def run_geom_corr(
         )
 
         # shift up to the noise floor so that the noise floor is at 0
-        deconvolver.shift_noise_floor_ptsrc(max_index_2d[0], max_index_2d[1])
-        max_signal = deconvolver.shifted_image[max_index_2d]
+        #deconvolver.shift_noise_floor_ptsrc(max_index_2d[0], max_index_2d[1])
+        max_signal = deconvolver.deconvolved_image[max_index_2d]
 
         if scale is None:
             scale = max_signal
         fwhm = deconvolver.calculate_fwhm(direction, max_index_2d, scale=scale)
+        print(results_save)
 
         # print("Indices of the maximum value (2D):", max_index_2d)
 
@@ -246,26 +250,26 @@ def run_geom_corr(
 
 # -------- ------- SETUP -------- -------
 results_folder = (
-    "/home/rileyannereid/workspace/geant4/simulation-results/67-2-fwhm-delta/"
+    "/home/rileyannereid/workspace/geant4/simulation-results/47-2-15/"
 )
-data_folder = "/home/rileyannereid/workspace/geant4/simulation-data/67-2-fwhm-delta/"
-maxpixel = 101
-pix_int = 6
+data_folder = "/home/rileyannereid/workspace/geant4/simulation-data/47-2-15/"
+maxpixel = 71
+pix_int = 7
 incs = range(pix_int, maxpixel, pix_int)
 niter = 8
 
 # -------- -------STEP 1 : need to get the raw hits (shielding stays, but no mask) -------- -------
 # need to comment out the physical mask vols in detector construction
 step1 = False
-simulate = False
-txt = True
+simulate = True
+txt = False
 hitsonly = True
 
 if step1:
-    for direction in ["0", "x", "y", "xy"]:
+    for direction in ["0","xy"]:
         allhits = []
         if direction != "0":
-            for inc in incs:
+            for inc in incs[:-1]:
                 avg_hits = 0
                 for i in range(niter):
                     _, _, nhits = run_geom_corr(
@@ -314,19 +318,22 @@ simulate = False
 txt = True
 hitsonly = False
 
-scale = None
+scale = 1
 center_hits = None
-include_hits_effect = True
+include_hits_effect = False
+
+niter = 1
 
 if step2:
-    for direction in ["0", "x", "y", "xy"]:
+    for direction in ["xy"]:
         fwhms = []
         signals = []
         if direction != "0":
             if include_hits_effect:
                 hits = np.loadtxt(f"{results_folder}{direction}-hits.txt")
-            for ii, inc in enumerate(incs):
+            for ii, inc in enumerate(incs[0:1]):
                 print(inc)
+                inc = 60
 
                 if include_hits_effect:
                     hit_norm = hits[ii] / center_hits
@@ -353,6 +360,7 @@ if step2:
                 fwhms.append(avg_fwhm / niter)
                 signals.append(avg_signal / niter)
             # save results
+            """
             np.savetxt(
                 f"{results_folder}{direction}-fwhm.txt",
                 np.array(fwhms),
@@ -407,3 +415,4 @@ if step2:
 
             if include_hits_effect:
                 center_hits = np.loadtxt(f"{results_folder}{direction}-hits.txt")
+    """

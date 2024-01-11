@@ -242,14 +242,22 @@ def write_surface_macro(
         if ring:
             f.write("/gps/pos/type Plane \n")
             f.write("/gps/pos/shape Square \n")
-            f.write("/gps/pos/halfx 5.3 cm \n")
-            f.write("/gps/pos/halfy 5.3 cm \n")  # 3.72066
-            f.write(f"/gps/pos/centre 0 0 {ca_pos-4} cm \n")
+            # define theta as fraction of FOV
+            fcfov_half = 37.3681  # deg
+            fov_frac = theta / fcfov_half
+
+            # n_particles = n_particles * np.sqrt(fov_frac)
+            # f.write(f"/gps/pos/radius {circle_radius} cm \n")
+            f.write(
+                "/gps/pos/halfx 2.445 cm \n"
+            )  # 4.875  # 3.72066 # 1.095 # 3.255 # 2.445 -- use for aperture
+            f.write("/gps/pos/halfz 2.445 cm \n")  # 4.875  # 3.72066
+            f.write(f"/gps/pos/centre 0 0 {ca_pos-0.5} cm \n")  # was -5
         else:
             f.write("/gps/pos/type Surface \n")
             f.write("/gps/pos/shape Sphere \n")
             f.write(f"/gps/pos/radius {radius_cm} cm \n")
-            f.write(f"/gps/pos/centre 0 0 499.95 cm \n")  # move it by just a micron
+            f.write(f"/gps/pos/centre 0 0 497.915 cm \n")  # 497.15
 
         # center chosen to align with pinhole (maybe change this?)
         # 499.935 is the front face of detector 1
@@ -263,9 +271,15 @@ def write_surface_macro(
 
         # if using user defined distribution
         if theta is not None:
+            #f.write("/gps/ang/type iso \n")  # iso
+            #f.write("/gps/ang/rot1 -1 0 0 \n")
+            #f.write("/gps/ang/rot2 0 1 0 \n")
+            #f.write("/gps/ang/mintheta 0 deg \n")
+            #f.write(f"/gps/ang/maxtheta {theta} deg \n")  # 90
+
             f.write("/gps/ang/type user \n")
-            f.write("/gps/ang/rot1 -1 0 0 \n")
-            f.write("/gps/ang/rot2 0 1 0 \n")
+            #f.write("/gps/ang/rot1 -1 0 0 \n")
+            #f.write("/gps/ang/rot2 0 1 0 \n")
             f.write("/gps/ang/surfnorm false \n")
             f.write("/gps/hist/type theta \n")
             f.write(f"/gps/hist/point {np.deg2rad(theta)} 1 \n")

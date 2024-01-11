@@ -20,19 +20,19 @@ simulation_engine = SimulationEngine(construct="CA", source="PS", write_files=Tr
 flat_field = None
 
 # general detector design
-det_size_cm = 2.68  # cm
-pixel = 0.2  # mm
+det_size_cm = 2.19  # cm
+pixel = 0.1  # mm
 
 # ---------- coded aperture set up ---------
 
 # set number of elements
-n_elements_original = 67
-multiplier = int(0.4 / pixel)
+n_elements_original = 73
+multiplier = 3
 
 element_size = pixel * multiplier
 n_elements = (2 * n_elements_original) - 1
 
-mask_size = element_size * n_elements
+mask_size = round(element_size * n_elements, 2)
 # no trim needed for custom design
 trim = None
 mosaic = True
@@ -41,13 +41,13 @@ mosaic = True
 thickness = 400  # um
 
 # focal length
-distance = 2  # cm
+distance = 1  # cm
 
-n_particles = 1e9
+n_particles = 1e7
 
 radius_cm = 7
 
-txt = False
+txt = True
 
 # --------------set up simulation---------------
 simulation_engine.set_config(
@@ -70,104 +70,138 @@ energy_level = 100  # keV
 
 total_raw_hits = 0
 
-for i in range(1):
-    fname_tag = f"{n_elements_original}-{distance}-cos-plane-fovlimited-{i}"
-    if txt:
-        fname = f"../simulation-results/{fname_tag}_{n_particles:.2E}_{energy_type}_{energy_level}_raw.txt"
-    else:
-        fname = f"../simulation-data/{fname_tag}_{n_particles:.2E}_{energy_type}_{energy_level}.csv"
+fname_tag = f"{n_elements_original}-{distance}-cos-plane-rotate-0"
+if txt:
+    fname = f"../simulation-results/{fname_tag}_{n_particles:.2E}_{energy_type}_{energy_level}_raw.txt"
+else:
+    fname = f"../simulation-data/{fname_tag}_{n_particles:.2E}_{energy_type}_{energy_level}.csv"
 
-    simulation_engine.set_macro(
-        n_particles=int(n_particles),
-        energy_keV=[energy_type, energy_level, None],
-        surface=True,
-        progress_mod=int(n_particles / 10),  # set with 10 steps
-        fname_tag=fname_tag,
-        confine=False,
-        detector_dim=det_size_cm,
-        theta=None,
-        radius_cm=radius_cm,
-        ring=True,
+simulation_engine.set_macro(
+    n_particles=int(n_particles),
+    energy_keV=[energy_type, energy_level, None],
+    surface=True,
+    progress_mod=int(n_particles / 10),  # set with 10 steps
+    fname_tag=fname_tag,
+    confine=False,
+    detector_dim=det_size_cm,
+    theta=None,
+    radius_cm=radius_cm,
+    ring=True,
+)
+
+# --------------RUN---------------
+# simulation_engine.run_simulation(fname, build=False, rename=True)
+
+# ---------- process results -----------
+results_dir = "/home/rileyannereid/workspace/geant4/simulation-results/"
+
+# load them for processing
+myhits = Hits(fname=fname, experiment=False, txt_file=txt)
+
+if not txt:
+    myhits.get_det_hits(
+        remove_secondaries=True, second_axis="y", energy_level=energy_level
     )
+    print(len(myhits.hits_dict["Position"]))
+    # myhits.exclude_pcfov(det_size_cm, mask_size * 0.1, distance, 2.0303, "y",radius_cm)
+    # print(len(myhits.hits_dict["Position"]))
 
-    # --------------RUN---------------
-    #simulation_engine.run_simulation(fname, build=False, rename=True)
+if txt:
+    total_raw_hits += np.sum(np.loadtxt(fname))
+    print(np.sum(np.loadtxt(fname)))
 
-    # ---------- process results -----------
-    results_dir = "/home/rileyannereid/workspace/geant4/simulation-results/"
+deconvolver = Deconvolution(myhits, simulation_engine)
 
-    # load them for processing
-    myhits = Hits(fname=fname, experiment=False, txt_file=txt)
+# directory to save results in
+results_tag = f"{fname_tag}_{n_particles:.2E}_{energy_type}_{energy_level}"
+results_save = results_dir + results_tag
 
-    if not txt:
-        myhits.get_det_hits(
-            remove_secondaries=True, second_axis="y", energy_level=energy_level
-        )
-        print(len(myhits.hits_dict["Position"]))
-        # myhits.exclude_pcfov(det_size_cm, mask_size * 0.1, distance, 2.0303, "y",radius_cm)
-        # print(len(myhits.hits_dict["Position"]))
+deconvolver.deconvolve(
+    downsample=int(multiplier * n_elements_original),
+    trim=trim,
+    vmax=None,
+    plot_deconvolved_heatmap=True,
+    plot_raw_heatmap=True,
+    save_raw_heatmap=results_save + "_raw.png",
+    save_deconvolve_heatmap=results_save + "_dc.png",
+    plot_signal_peak=False,
+    plot_conditions=False,
+    flat_field_array=flat_field,
+    hits_txt=txt,
+    rotate=False,
+    delta_decoding=True,
+)
 
-    if txt:
-        total_raw_hits += np.sum(np.loadtxt(fname))
-        print(np.sum(np.loadtxt(fname)))
-        # check if not first iteration
-        if i != 0:
-            myhits.txt_hits += hits_copy.txt_hits
-            hits_copy = copy.copy(myhits)
-        else:
-            hits_copy = copy.copy(myhits)
-
-    # print(fname_tag)
-    # print(np.sum(np.loadtxt(fname)))
-
-    deconvolver = Deconvolution(myhits, simulation_engine)
-
-    # directory to save results in
-    results_tag = f"{fname_tag}_{n_particles:.2E}_{energy_type}_{energy_level}"
-    results_save = results_dir + results_tag
-
-    deconvolver.deconvolve(
-        downsample=int(3 * n_elements_original),
-        trim=trim,
-        vmax=None,
-        plot_deconvolved_heatmap=True,
-        plot_raw_heatmap=True,
-        save_raw_heatmap=results_save + "_raw.png",
-        save_deconvolve_heatmap=results_save + "_dc.png",
-        plot_signal_peak=False,
-        plot_conditions=False,
-        flat_field_array=flat_field,
-        hits_txt=txt,
-        rotate=False,
-        delta_decoding=False,
-    )
-
-    signal = deconvolver.deconvolved_image
-    print(np.sum(signal))
+signal = deconvolver.deconvolved_image
+print(np.sum(signal))
 
 
-for i in range(1):
-    fname_tag = f"{n_elements_original}-{distance}-cos-sphere-fovlimited-rotate-{i}"
-    if txt:
-        fname = f"../simulation-results/{fname_tag}_{n_particles:.2E}_{energy_type}_{energy_level}_raw.txt"
-    else:
-        fname = f"../simulation-data/{fname_tag}_{n_particles:.2E}_{energy_type}_{energy_level}.csv"
+fname_tag = f"{n_elements_original}-{distance}-cos-plane-0"
+if txt:
+    fname = f"../simulation-results/{fname_tag}_{n_particles:.2E}_{energy_type}_{energy_level}_raw.txt"
+else:
+    fname = f"../simulation-data/{fname_tag}_{n_particles:.2E}_{energy_type}_{energy_level}.csv"
 
-    simulation_engine.set_macro(
-        n_particles=int(n_particles),
-        energy_keV=[energy_type, energy_level, None],
-        surface=True,
-        progress_mod=int(n_particles / 10),  # set with 10 steps
-        fname_tag=fname_tag,
-        confine=False,
-        detector_dim=det_size_cm,
-        theta=None,
-        radius_cm=radius_cm,
-        ring=True,
-    )
+myhits = Hits(fname=fname, experiment=False, txt_file=txt)
 
-    # --------------RUN---------------
-    #simulation_engine.run_simulation(fname, build=False, rename=True)
+
+deconvolver = Deconvolution(myhits, simulation_engine)
+
+# directory to save results in
+results_tag = f"{fname_tag}_{n_particles:.2E}_{energy_type}_{energy_level}"
+results_save = results_dir + results_tag
+
+deconvolver.deconvolve(
+    downsample=int(multiplier * n_elements_original),
+    trim=trim,
+    vmax=None,
+    plot_deconvolved_heatmap=True,
+    plot_raw_heatmap=True,
+    save_raw_heatmap=results_save + "_raw.png",
+    save_deconvolve_heatmap=results_save + "_dc.png",
+    plot_signal_peak=False,
+    plot_conditions=False,
+    flat_field_array=flat_field,
+    hits_txt=txt,
+    rotate=True,
+    delta_decoding=True,
+)
+
+if txt:
+    total_raw_hits += np.sum(np.loadtxt(fname))
+    print(np.sum(np.loadtxt(fname)))
+
+signal_r = deconvolver.deconvolved_image
+print(np.sum(signal_r))
+
+signal_combined = signal_r + signal
+plt.imshow(signal_combined, cmap=cmap)
+plt.colorbar()
+plt.savefig(f"{results_dir}signal_combined.png")
+
+"""
+for i in range(0):
+fname_tag = f"{n_elements_original}-{distance}-cos-sphere-fovlimited-rotate-{i}"
+if txt:
+    fname = f"../simulation-results/{fname_tag}_{n_particles:.2E}_{energy_type}_{energy_level}_raw.txt"
+else:
+    fname = f"../simulation-data/{fname_tag}_{n_particles:.2E}_{energy_type}_{energy_level}.csv"
+
+simulation_engine.set_macro(
+    n_particles=int(n_particles),
+    energy_keV=[energy_type, energy_level, None],
+    surface=True,
+    progress_mod=int(n_particles / 10),  # set with 10 steps
+    fname_tag=fname_tag,
+    confine=False,
+    detector_dim=det_size_cm,
+    theta=None,
+    radius_cm=radius_cm,
+    ring=True,
+)
+
+# --------------RUN---------------
+# simulation_engine.run_simulation(fname, build=False, rename=True)
 
     # ---------- process results -----------
     results_dir = "/home/rileyannereid/workspace/geant4/simulation-results/"
@@ -294,3 +328,4 @@ plt.savefig(f"{results_dir}final.png", dpi=500, transparent=True)
 # problems....
 # can i remove them? does that make sense?
 # i think there is a lot of them and I need to remove them in post..... :(
+"""

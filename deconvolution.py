@@ -18,6 +18,8 @@ import math
 import cv2
 import sys
 from pyfftw.interfaces import scipy_fftpack as fftw
+from skimage.util import random_noise
+from photutils.datasets import apply_poisson_noise, make_4gaussians_image
 
 sys.path.insert(1, "../coded_aperture_mask_designs")
 from util_fncs import makeMURA, make_mosaic_MURA, get_decoder_MURA, updated_get_decoder
@@ -49,7 +51,8 @@ class Deconvolution:
             self.element_size_mm = 1.21
             self.n_pixels = 256  # minpix EDU
             self.pixel_size = 0.0055  # minpix EDU
-
+        
+        self.pinhole = False
         return
 
     def shift_pos(self) -> None:
@@ -99,6 +102,7 @@ class Deconvolution:
             heatmap: 2d histogram of hits
         """
 
+
         xxes = [p[0] for p in self.hits_dict["Position"]]
         yxes = [p[1] for p in self.hits_dict["Position"]]
 
@@ -109,6 +113,12 @@ class Deconvolution:
                 xxes, yxes, bins=self.resample_n_pixels
             )
             # heatmap, xedges, yedges = np.histogram2d(xxes, yxes, bins=int( (self.n_pixels-(self.trim*2))))
+        elif self.pinhole:
+            bin_edges_x = np.linspace(0, self.det_size_cm, int(self.downsample))
+            bin_edges_y = np.linspace(0, self.det_size_cm, int(self.downsample))
+            heatmap, xedges, yedges = np.histogram2d(
+                xxes, yxes, bins=[bin_edges_x, bin_edges_y]
+            )
         else:
             heatmap, xedges, yedges = np.histogram2d(
                 xxes, yxes, bins=int(self.downsample)
@@ -165,7 +175,7 @@ class Deconvolution:
         plt.colorbar(label=label)
         plt.xlabel("pixel")
         plt.ylabel("pixel")
-        plt.savefig(save_name, transparent=True, dpi=500)
+        plt.savefig(save_name, transparent=False, dpi=500)
         plt.close()
 
         return
@@ -216,6 +226,8 @@ class Deconvolution:
             or self.mura_elements == 31
             or self.mura_elements == 11
             or self.mura_elements == 7
+            or self.mura_elements == 73
+            or self.mura_elements == 47
         ):
             check = 0
         else:
@@ -240,10 +252,10 @@ class Deconvolution:
             decoder = decoder_zeros
 
         # mismatched
-        # decoder[decoder == -1] = 0
-
         if rotate:
-            self.decoder = decoder * -1
+            self.rawIm = np.fliplr(np.flipud(self.rawIm)) # also include the flip lr for 73 ??? 
+            #self.decoder = decoder * -1
+            self.decoder = decoder
         else:
             self.decoder = decoder
 
@@ -260,14 +272,10 @@ class Deconvolution:
 
         # scipy.ndimage.zoom used here
         # resizedIm = ndimage.zoom(self.rawIm, len(self.decoder) / len(self.rawIm))
-        resizedIm = np.rot90(self.rawIm)
 
         # Fourier space multiplication
         Image = np.real(
-            np.fft.ifft2(
-                np.fft.fft2(resizedIm)
-                * np.fft.fft2(np.flipud(np.fliplr((self.decoder))))
-            )
+            np.fft.ifft2(np.fft.fft2(self.rawIm) * np.fft.fft2(np.rot90(self.decoder)))
         )
 
         # Shift to by half of image length after convolution
@@ -449,6 +457,7 @@ class Deconvolution:
         rotate: bool = False,
         correct_collimation: bool = False,
         delta_decoding: bool = True,
+        apply_noise: bool = True,
     ) -> bool:
         """
         perform all the steps to deconvolve a raw image
@@ -487,6 +496,7 @@ class Deconvolution:
             self.get_raw()
             if apply_distribution:
                 self.apply_dist(dist_type)
+            print("SAVE TXT")
             np.savetxt(f"{save_raw_heatmap[:-3]}txt", self.raw_heatmap)
         elif hits_txt:
             self.raw_heatmap = self.hits_data
@@ -494,34 +504,39 @@ class Deconvolution:
         if correct_collimation:
             self.correct_aperture_collimation(mask_thickness_um=400, focal_length_cm=2)
 
+        if apply_noise:
+            self.apply_ps_noise()
+
         if plot_raw_heatmap:
             self.plot_heatmap(self.raw_heatmap, save_name=save_raw_heatmap, vmax=vmax)
 
-        # get mask and decoder
-        self.get_mask(self.simulation_engine.mosaic)
-        self.get_decoder(check, rotate, delta_decoding)
-
-        # flip the heatmap over both axes bc point hole
-        # rawIm = np.fliplr(self.raw_heatmap)
-
-        # reflect bc correlation needs to equal convolution
-        # rawIm = np.fliplr(rawIm)
         self.rawIm = self.raw_heatmap
 
-        # deconvolve
-        self.fft_conv()
+        if self.pinhole == False:
+            # get mask and decoder
+            self.get_mask(self.simulation_engine.mosaic)
+            self.get_decoder(check, rotate, delta_decoding)
 
-        # self.deconvolved_image = self.deconvolved_image / (67**2 * 3**2 * 0.5)
+            # flip the heatmap over both axes bc point hole
+            # rawIm = np.fliplr(self.raw_heatmap)
 
-        if flat_field_array is not None:
-            self.flat_field(flat_field_array)
-        if plot_deconvolved_heatmap:
-            self.plot_heatmap(
-                self.deconvolved_image,
-                save_name=save_deconvolve_heatmap,
-                label="signal",
-                vmax=vmax,
-            )
+            # reflect bc correlation needs to equal convolution
+            # rawIm = np.fliplr(rawIm)
+
+            # deconvolve
+            self.fft_conv()
+
+            # self.deconvolved_image = self.deconvolved_image / (67**2 * 3**2 * 0.5)
+
+            if flat_field_array is not None:
+                self.flat_field(flat_field_array)
+            if plot_deconvolved_heatmap:
+                self.plot_heatmap(
+                    self.deconvolved_image,
+                    save_name=save_deconvolve_heatmap,
+                    label="signal",
+                    vmax=vmax,
+                )
         """
         snr = np.amax(np.abs(self.deconvolved_image)) / np.std(
             np.abs(self.deconvolved_image)
@@ -571,12 +586,71 @@ class Deconvolution:
         """
         return
 
+    def apply_ps_noise(self):
+        noise_mask = np.random.poisson(self.raw_heatmap)
+
+        self.raw_heatmap = self.raw_heatmap + noise_mask
+        detector_noise = self.dark_current(self.raw_heatmap, 100/(219**2))
+        self.raw_heatmap += detector_noise
+        # self.raw_heatmap = random_noise(self.raw_heatmap, mode="poisson")
+        # self.raw_heatmap = apply_poisson_noise(self.raw_heatmap, seed=1)
+
+    # https://mwcraig.github.io/ccd-as-book/01-03-Construction-of-an-artificial-but-realistic-image.html
+
+    def dark_current(
+        self, image, current, exposure_time=1.0, gain=1.0, hot_pixels=False
+    ):
+        """
+        Simulate dark current in a CCD, optionally including hot pixels.
+
+        Parameters
+        ----------
+
+        image : numpy array
+            Image whose shape the cosmic array should match.
+        current : float
+            Dark current, in electrons/pixel/second, which is the way manufacturers typically
+            report it.
+        exposure_time : float
+            Length of the simulated exposure, in seconds.
+        gain : float, optional
+            Gain of the camera, in units of electrons/ADU.
+        strength : float, optional
+            Pixel count in the cosmic rays.
+        """
+
+        # dark current for every pixel; we'll modify the current for some pixels if
+        # the user wants hot pixels.
+        base_current = current * exposure_time / gain
+
+        # This random number generation should change on each call.
+        dark_im = np.random.poisson(base_current, size=image.shape)
+
+        if hot_pixels:
+            # We'll set 0.01% of the pixels to be hot; that is probably too high but should
+            # ensure they are visible.
+            y_max, x_max = dark_im.shape
+
+            n_hot = int(0.0001 * x_max * y_max)
+
+            # Like with the bias image, we want the hot pixels to always be in the same places
+            # (at least for the same image size) but also want them to appear to be randomly
+            # distributed. So we set a random number seed to ensure we always get the same thing.
+            rng = np.random.RandomState(16201649)
+            hot_x = rng.randint(0, x_max, size=n_hot)
+            hot_y = rng.randint(0, y_max, size=n_hot)
+
+            hot_current = 10000 * current
+
+            dark_im[[hot_y, hot_x]] = hot_current * exposure_time / gain
+        return dark_im
+
     def anti_mask_signal(self, save_name=None):
         self.anti_decoder = -1 * self.decoder
 
         # scipy.ndimage.zoom used here
         resizedIm = ndimage.zoom(self.rawIm, len(self.anti_decoder) / len(self.rawIm))
-        resizedIm = np.rot90(resizedIm)
+        # resizedIm = np.rot90(resizedIm)
 
         # Fourier space multiplication
         Image = np.real(
@@ -674,11 +748,11 @@ class Deconvolution:
 
         # get the shifted image and scale
         img = (
-            self.shifted_image / scale
+            self.deconvolved_image / scale
         )  # this is the average signal over 0 after shifting for pt source centered
         import matplotlib.pyplot as plt
 
-        sect = 10
+        sect = 6
 
         # get the section where the signal is
         img_bound = img.shape[0] - 1
@@ -729,6 +803,8 @@ class Deconvolution:
                 max_index[1] - sect : max_index[1] + sect + 1,
             ]
 
+        #self.plot_3D_signal(img_clipped)
+
         FWHM, params = getFWHM_GaussianFitScaledAmp(img_clipped, direction)
 
         # for plotting if interested
@@ -743,7 +819,6 @@ class Deconvolution:
             )
         )
 
-        # self.plot_3D_signal(img_clipped)
 
         return FWHM
 

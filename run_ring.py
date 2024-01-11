@@ -6,6 +6,8 @@ from scipy import interpolate
 from macros import find_disp_pos
 import numpy as np
 import os
+import subprocess
+
 from scipy.io import savemat
 from itertools import cycle
 import matplotlib.pyplot as plt
@@ -17,28 +19,18 @@ from plotting.plot_settings import *
 
 simulation_engine = SimulationEngine(construct="CA", source="PS", write_files=True)
 
-
-# FWHM array
-txt_folder = "/home/rileyannereid/workspace/geant4/simulation-results/67-2-fwhm/"
-fwhm = np.loadtxt(f"{txt_folder}fwhm_interp_grid_instrument-only_edges-removed_1d.txt")
-
-radial_1D = np.linspace(0, 2 * 45.254833995939045, 100)
-# f = interpolate.interp1d(radial_1D, fwhm)
-
-txt = True
-run_rotate = False
-simulate = False
-combine = False
+txt = False
+simulate = True
 
 # general detector design
-det_size_cm = 2.68  # cm
-pixel = 0.2  # mm
+det_size_cm = 2.19  # cm
+pixel = 0.1  # mm
 pixel_size = pixel * 0.1
 
 # ---------- coded aperture set up ---------
 # set number of elements
-n_elements_original = 67
-multiplier = int(0.4 / pixel)
+n_elements_original = 73
+multiplier = 3
 
 element_size = pixel * multiplier
 n_elements = (2 * n_elements_original) - 1
@@ -53,54 +45,26 @@ thickness = 400  # um
 
 # focal length
 distance = 2  # cm
-"""
-inds = []
-# first, which pixel do we want to hit
-thetas = []
-first_theta_ind = 2
-# amount of spreading
-first_theta_fwhm = f(first_theta_ind)
-first_theta = np.rad2deg(np.arctan(first_theta_ind * pixel_size / distance))
-next_theta_ind = (
-    np.ceil((first_theta_fwhm / 2) + first_theta_ind) + 1
-)  # expected spreading
 
-thetas.append(first_theta)
-las_theta = 0
-inds.append(first_theta_ind)
-inds.append(next_theta_ind)
-
-rects = []
-uncertainties = []
-
-while next_theta_ind < 67:
-    # now get next theta using nextx fwhm
-
-    next_theta_fwhm = f(next_theta_ind)
-
-    next_theta = np.rad2deg(np.arctan(next_theta_ind * pixel_size / distance))
-    thetas.append(next_theta)
-
-    # then compute the next theta
-    next_theta_ind = np.ceil((next_theta_fwhm / 2) + next_theta_ind) + 1
-
-    # print(next_theta-las_theta)
-    las_theta = next_theta
-    inds.append(next_theta_ind)
-"""
-n_particles = 1e8
-nhits = []
-# color_ring = ["#FF006E", "#FB5607", "#FFBE0B", "#3A86FF", "#8338EC"]
-# color_ring = list(next(cycle([color_ring])) for _ in range(len(thetas)))
-# color_ring = [item for sublist in color_ring for item in sublist]
-
-# inds = inds[10:11]
-thetas = [17.74]
-
+thetas = [2.865, 11.305, 19.295, 26.565, 33.025]
+thetas = [85]
+# for pinhole
+#n_elements_original = 1
+#n_elements = 1
+#mosaic = False
+#mask_size = 21.9
+raw_hits = np.zeros((219,219))
 # ------------------- simulation parameters ------------------
 for ii, theta in enumerate(thetas):
     print(theta)
-    angles = []
+
+    # simulate 3e8 per cm^2 per sr per s
+    # 3e8 for full circle * sr * cm
+    # 1e7 for ring * cm
+    # 5e8 for sphere
+    #n_particles = int((3e6* (2.445 * 2) ** 2) * (1 - np.cos(np.deg2rad(theta))))
+    n_particles = int(1e6 *  (2.445  * 2) ** 2)
+
     # --------------set up simulation---------------
     simulation_engine.set_config(
         det1_thickness_um=300,
@@ -121,29 +85,14 @@ for ii, theta in enumerate(thetas):
     energy_level = 100  # keV
 
     # --------------set up data naming---------------
-    # formatted_theta = "{:.0f}p{:02d}".format(int(theta), int((theta % 1) * 100))
-    formatted_theta = "17p74"
-    fname_tag = f"{n_elements_original}-{distance}-{formatted_theta}-deg-d2-3p98"
-
-    # only is simulating rotated
-    if run_rotate:
-        fname_tag = (
-            f"{n_elements_original}-{distance}-{formatted_theta}-deg-d2-3p98-rotate"
-        )
+    formatted_theta = "{:.0f}p{:02d}".format(int(theta), int((theta % 1) * 100))
+    fname_tag = f"{n_elements_original}-{distance}-{formatted_theta}-deg"
 
     fname = f"../simulation-data/rings/{fname_tag}_{n_particles:.2E}_{energy_type}_{energy_level}_{formatted_theta}.csv"
 
-    # if processing combined
-    fname_tag_r = (
-        f"{n_elements_original}-{distance}-{formatted_theta}-deg-d2-3p98-rotate"
-    )
-    fname_r = f"../simulation-data/rings/{fname_tag_r}_{n_particles:.2E}_{energy_type}_{energy_level}_{formatted_theta}.csv"
-
     if txt:
         fname = f"../simulation-results/rings/{fname_tag}_{n_particles:.2E}_{energy_type}_{energy_level}_raw.txt"
-        # only used if doing combined
-        fname_r = f"../simulation-results/rings/{fname_tag_r}_{n_particles:.2E}_{energy_type}_{energy_level}_raw.txt"
-
+    
     simulation_engine.set_macro(
         n_particles=int(n_particles),
         energy_keV=[energy_type, energy_level, None],
@@ -154,6 +103,7 @@ for ii, theta in enumerate(thetas):
         detector_dim=det_size_cm,
         theta=theta,
         ring=True,
+        #radius_cm=3,
     )
 
     # --------------RUN---------------
@@ -161,22 +111,27 @@ for ii, theta in enumerate(thetas):
         simulation_engine.run_simulation(fname, build=False, rename=True)
 
     # ---------- process results -----------
+    #raw_hits += np.loadtxt(fname) + np.loadtxt("../simulation-results/rings/73-2-19p29-deg-circle_4.03E+08_Mono_100_raw.txt")
+
+    #results_save = "../simulation-results/rings/ring_circle"
+    #fname = results_save+"_raw.txt"
+    #np.savetxt(fname,raw_hits)
+
     myhits = Hits(fname=fname, experiment=False, txt_file=txt)
     if not txt:
         myhits.get_det_hits(
-            remove_secondaries=True, second_axis="y", energy_level=energy_level
-        )
-
-    # deconvolution steps
-    deconvolver = Deconvolution(myhits, simulation_engine)
+            remove_secondaries=True, second_axis="y", energy_level=energy_level)
 
     # directory to save results in
     results_dir = "../simulation-results/rings/"
     results_tag = f"{fname_tag}_{n_particles:.2E}_{energy_type}_{energy_level}"
     results_save = results_dir + results_tag
 
+    # deconvolution steps
+    deconvolver = Deconvolution(myhits, simulation_engine)
+
     deconvolver.deconvolve(
-        downsample=int(3 * n_elements_original),
+        downsample=int(73*3),
         trim=trim,
         vmax=None,
         plot_deconvolved_heatmap=True,
@@ -187,144 +142,111 @@ for ii, theta in enumerate(thetas):
         plot_conditions=False,
         flat_field_array=None,
         hits_txt=txt,
-        rotate=False,
+        rotate=True,
         delta_decoding=True,
+        apply_noise=False,
     )
-    signal = deconvolver.deconvolved_image
-    deconvolver.lucy_richardson(results_save + "LR.png")
-    data = {"signal": signal}
-
-    # Specify the file path where you want to save the .mat file
-    file_path = "signal.mat"
-
-    # Save the grid data as a .mat file
-    savemat(file_path, data)
-
-    deconvolver.export_to_matlab()
-
-    print(np.sum(signal))
     print(np.sum(deconvolver.raw_heatmap))
+    print(np.sum(deconvolver.deconvolved_image))
+"""
+    np.savetxt(results_save+"_dc.txt",deconvolver.deconvolved_image)
 
-    if combine:
-        myhits = Hits(fname=fname_r, experiment=False, txt_file=txt)
-        if not txt:
-            myhits.get_det_hits(
-                remove_secondaries=True, second_axis="y", energy_level=energy_level
-            )
-
-        # deconvolution steps
-        deconvolver = Deconvolution(myhits, simulation_engine)
-
-        # directory to save results in
-        results_dir = "../simulation-results/rings/"
-        results_tag = f"{fname_tag_r}_{n_particles:.2E}_{energy_type}_{energy_level}"
-        results_save = results_dir + results_tag
-
-        deconvolver.deconvolve(
-            downsample=int(3 * n_elements_original),
-            trim=trim,
-            vmax=None,
-            plot_deconvolved_heatmap=True,
-            plot_raw_heatmap=True,
-            save_raw_heatmap=results_save + "_raw.png",
-            save_deconvolve_heatmap=results_save + "_dc.png",
-            plot_signal_peak=False,
-            plot_conditions=False,
-            flat_field_array=None,
-            hits_txt=txt,
-            rotate=True,
-            delta_decoding=True,
-        )
-
-        signal_r = deconvolver.deconvolved_image
-
-        fname_tag_c = (
-            f"{n_elements_original}-{distance}-{formatted_theta}-deg-d2-3p98-combine"
-        )
-        results_tag_c = f"{fname_tag_c}_{n_particles:.2E}_{energy_type}_{energy_level}"
-        results_save_c = results_dir + results_tag_c
-
-        signal = signal_r + signal
-        print(np.sum(signal))
-
-        # save it as well
-        plt.clf()
-        plt.imshow(signal, cmap=cmap)
-        plt.colorbar()
-        plt.savefig(results_save_c + ".png")
-        plt.clf()
-    """
-    # for now, take a small upper section without banding
-    # subtract RMS!
-    noise_floor = np.mean(signal[:20, :20])
-
-    # subtract the noise floor
-    signal = signal - noise_floor
-
+    # loop through pixels
+    signal = deconvolver.deconvolved_image
+    pixel_count = int(73*3)
     max_value = np.max(signal)
+    signal_count = 0
+    total_count = 0
+    center_pixel = int(218/2)
+    geometric_factor = 2.19409
 
-    pixel_count = 134
-    center_pixel = 67
-    rx_rect = []
     for x in range(pixel_count):
         for y in range(pixel_count):
-            # find pixels with signal over threshold
-            if signal[y, x] > max_value / 4:
-                relative_x = (x - center_pixel) * pixel_size
-                relative_y = (y - center_pixel) * pixel_size
 
-                aa = np.sqrt(relative_x**2 + relative_y**2)
+            relative_x = (x - center_pixel) * pixel_size
+            relative_y = (y - center_pixel) * pixel_size
 
-                # find the geometrical theta angle of the pixel
-                angle = np.arctan(aa / distance)
+            aa = np.sqrt(relative_x**2 + relative_y**2)
 
-                # largest expected distance is 3 pixels  -- check that we are within that
-                largest_expected_px_distance = np.rad2deg(
-                    np.arctan(2.7 * pixel_size / distance)
+            # find the geometrical theta angle of the pixel
+            angle = np.arctan(aa / distance)
+
+            # signal[y,x] > max_value / 4 and 
+
+            if np.rad2deg(angle) < (theta+0.5) and np.rad2deg(angle) > (theta - 0.5):
+                signal_count += 1
+                total_count += signal[y,x]
+
+                rect = patches.Rectangle(
+                    (x - 0.5, y - 0.5),
+                    1,
+                    1,
+                    linewidth=2,
+                    edgecolor="black",
+                    facecolor="none",
                 )
-                if np.abs(np.rad2deg(angle) - (theta)) < largest_expected_px_distance:
-                    # for plotting the pixels that are identified with signal
-                    rx_rect.append((x, y))
-                    angles.append(angle)
-                else:
-                    # print("got some noise")
-                    pass
-    rects.append(rx_rect)
+                #plt.gca().add_patch(rect)
 
-    plt.clf()
-    for ri, rr in enumerate(rects):
-        for rx in rr:
-            rx = patches.Rectangle(
-                (rx[0] - 0.5, rx[1] - 0.5),
-                1,
-                1,
-                linewidth=1,
-                edgecolor=color_ring[ri],
-                facecolor=color_ring[ri],
-                alpha=0.5,
+    #plt.imshow(signal, cmap=cmap)
+    #plt.colorbar()
+    #plt.show()
+
+    px_factor = signal_count / (pixel_count**2)
+    print("recorded flux", total_count  / (geometric_factor * px_factor))
+"""
+"""
+raw_hits = np.zeros((219,219))
+
+    if not txt:
+        nlines = 10000000
+        # Construct the terminal command using the wc command
+        command = ['wc', '-l', fname]
+        # Run the command and capture the output
+        result = subprocess.run(command, capture_output=True, text=True)
+
+        # Check if the command was successful
+        if result.returncode == 0:
+            # Extract the number of lines from the command output
+            num_lines = int(result.stdout.split()[0])
+            print(f'The number of lines in {fname} is: {num_lines}')
+        else:
+            print(f'Error running command: {result.stderr}')
+
+        for ii in range(nlines,int(num_lines),nlines):
+            # directory to save results in
+            results_dir = "../simulation-results/rings/"
+            results_tag = f"{fname_tag}_{n_particles:.2E}_{energy_type}_{energy_level}_{ii}"
+            results_save = results_dir + results_tag
+            if num_lines - ii < nlines:
+                nlines = num_lines - ii
+            myhits = Hits(fname=fname, experiment=False, txt_file=txt,nlines=nlines,nstart=ii)
+            myhits.get_det_hits(
+                remove_secondaries=True, second_axis="y", energy_level=energy_level)
+
+            # deconvolution steps
+            deconvolver = Deconvolution(myhits, simulation_engine)
+
+            deconvolver.deconvolve(
+                downsample=int(73*3),
+                trim=trim,
+                vmax=None,
+                plot_deconvolved_heatmap=True,
+                plot_raw_heatmap=True,
+                save_deconvolve_heatmap=results_save + "_dc.png",
+                plot_signal_peak=False,
+                plot_conditions=False,
+                flat_field_array=None,
+                hits_txt=txt,
+                rotate=True,
+                delta_decoding=True,
+                apply_noise=False,
             )
-            plt.gca().add_patch(rx)
+            print(np.sum(deconvolver.raw_heatmap))
+            print(np.sum(deconvolver.deconvolved_image))
 
-    plt.imshow(np.zeros_like(signal), cmap="gray_r")
-    plt.xlim([67 - (ind + 4), 67 + (ind + 4)])
-    plt.ylim([67 - (ind + 4), 67 + (ind + 4)])
-
-    plt.savefig(
-        f"/home/rileyannereid/workspace/geant4/simulation-results/rings/indices{ii}.png",
-        dpi=800,
-    )
-
-    uncertainties.append(np.abs((min(angles) - max(angles)) / 2))
-
-np.savetxt(f"{results_dir}uncertainties.txt", np.array(uncertainties))
-np.savetxt(f"{results_dir}thetas.txt", np.array(thetas))
-
-with open(f"{results_dir}inds.txt", "w") as file:
-    for sublist in rects:
-        for x, y in sublist:
-            # Convert the tuple to a formatted string (e.g., "1,2")
-            line = f"{x},{y}\n"
-            file.write(line)
-        # Add a newline character after each sublist
-        file.write("\n")
+            raw_hits += np.loadtxt(results_save+"_raw.txt")
+        
+        results_tag = f"{fname_tag}_{n_particles:.2E}_{energy_type}_{energy_level}"
+        results_save = results_dir + results_tag
+        np.savetxt(results_save+"_raw.txt", raw_hits)
 """
