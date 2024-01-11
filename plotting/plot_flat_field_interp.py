@@ -5,12 +5,12 @@ from scipy.optimize import curve_fit
 from scipy.io import savemat
 
 # Load x and y values from separate text files
-txt_folder = "/home/rileyannereid/workspace/geant4/simulation-results/67-2-fwhm-delta/"
+txt_folder = "/home/rileyannereid/workspace/geant4/simulation-results/47-2-15/"
 
-maxpixel = 96
-num_points = 16
-maxgrid  = 192
-px_int = 6
+maxpixel = 63
+num_points = 11
+maxgrid  = 126
+px_int = 7
 
 hits = True
 remove_edges = True
@@ -28,8 +28,8 @@ data_product = "fwhm"
 output_name = f"{txt_folder}{data_product}_interp_grid_{hits_str}_{edges_str}"
 
 # load data
-zx = np.loadtxt(f"{txt_folder}x-{data_product}.txt")
-zy = np.loadtxt(f"{txt_folder}y-{data_product}.txt")
+#zx = np.loadtxt(f"{txt_folder}x-{data_product}.txt")
+#zy = np.loadtxt(f"{txt_folder}y-{data_product}.txt")
 zz = np.loadtxt(f"{txt_folder}xy-{data_product}.txt")
 
 zc = np.loadtxt(f"{txt_folder}0-{data_product}.txt")
@@ -52,39 +52,40 @@ if hits and data_product == "signal":
     zz = np.insert(zz, 0, 1)
 
 elif data_product == "signal":
-    zx = np.array([(z / zc) for z in zx])
-    zy = np.array([(z / zc) for z in zy])
+    #zx = np.array([(z / zc) for z in zx])
+    #zy = np.array([(z / zc) for z in zy])
     zz = np.array([(z / zc) for z in zz])
-    zx = np.insert(zx, 0, 1)
-    zy = np.insert(zy, 0, 1)
+    #zx = np.insert(zx, 0, 1)
+    #zy = np.insert(zy, 0, 1)
     zz = np.insert(zz, 0, 1)
 
 else:
     # add in central fwhm or central hits ratio
-    zx = np.insert(zx, 0, zc)
-    zy = np.insert(zy, 0, zc)
+    #zx = np.insert(zx, 0, zc)
+    #zy = np.insert(zy, 0, zc)
     zz = np.insert(zz, 0, zc)
 
 if remove_edges:
-    zx = zx[:-1]
-    zy = zy[:-1]
+    #zx = zx[:-1]
+    #zy = zy[:-1]
     zz = zz[:-1]
-    maxpixel -= px_int
+    #maxpixel -= px_int
 
 # Create an array in reverse order
-reverse_zx = np.flip(zx)
-reverse_zy = np.flip(zy)
+#reverse_zx = np.flip(zx)
+#reverse_zy = np.flip(zy)
 reverse_zz = np.flip(zz)
 
 # Stack the input and reverse arrays together
-stacked_zx = np.hstack((reverse_zx, zx[1:]))
-stacked_zy = np.hstack((reverse_zy, zy[1:]))
+#stacked_zx = np.hstack((reverse_zx, zx[1:]))
+#stacked_zy = np.hstack((reverse_zy, zy[1:]))
 stacked_zz = np.hstack((reverse_zz, zz[1:]))
 
 # we only need stacked zz now
-main_diagonal = np.array([(i - maxpixel, i - maxpixel) for i in range(0, maxgrid-px_int, px_int)])
-diagonal_radial = np.array([np.sqrt(md[0]**2 + md[1]**2) for md in main_diagonal])
+main_diagonal = np.array([(i - maxpixel, i - maxpixel) for i in range(0, maxgrid+px_int, px_int)])
+main_diagonal = main_diagonal[1:-1]
 
+diagonal_radial = np.array([np.sqrt(md[0]**2 + md[1]**2) for md in main_diagonal])
 # okay now we have the function
 def polynomial_function(x, *coefficients):
     return np.polyval(coefficients, x)
@@ -94,7 +95,7 @@ degree = 3
 initial_guess = np.ones(degree + 1)  # Initial guess for the polynomial coefficients
 params, covariance = curve_fit(polynomial_function, diagonal_radial, stacked_zz, p0=initial_guess)
 
-width, height = 201, 201
+width, height = 141,141
 x = np.linspace(0, width - 1, width)
 y = np.linspace(0, height - 1, height)
 x, y = np.meshgrid(x, y)
