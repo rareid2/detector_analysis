@@ -67,7 +67,7 @@ hex_list = [
 
 # prospectus colors
 # hex_list = ["#023047","#219EBC","#FFB703","#FB8500","#F15025"]
-hex_list = ["#264653", "#2a9d8f", "#e9c46a", "#f4a261", "#e76f51"]
+
 hex_list = ["#ffbe0b", "#fb5607", "#ff006e", "#8338ec", "#3a86ff"]
 hex_list = ["#05668d", "#028090", "#00a896", "#02c39a", "#f0f3bd"]
 hex_list = ["#264653", "#2a9d8f", "#e9c46a", "#f4a261", "#e76f51"]
@@ -83,6 +83,9 @@ hex_list = [
     "#ae2012",
     "#9b2226",
 ]
+hex_list = ["#264653", "#2a9d8f", "#e9c46a", "#f4a261", "#e76f51"]
+hex_list = ["#0d3b66","#faf0ca","#f4d35e","#ee964b","#f95738"]
+hex_list = ["#240046","#5a189a","#9d4edd","#C698EB","#8ADCF9","#FFFFFF","#FFC05C","#ff9e00","#ff6d00","#ff8500"]
 cmap = get_continuous_cmap(hex_list)
 
 hex_colors = []
@@ -90,6 +93,9 @@ for i in range(cmap.N):
     rgba = cmap(i)
     # rgb2hex accepts rgb or rgba
     hex_colors.append(mcolors.rgb2hex(rgba))
+
+#cs = [ "#150326","#34085E","#540D96","#7312CE","#7312CE","#B069F2","#CDA1F7","white","#FFF0EB","#FFD2C2","#FFB499","#FF9670","#FF7847","#FF5A1F","#F54100"]
+#cmap = mcolors.LinearSegmentedColormap.from_list("cmap_name", cs)
 
 """
 # Set default parameters for plots

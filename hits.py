@@ -15,8 +15,8 @@ class Hits:
         experiment_engine: ExperimentEngine = None,
         file_count: int = 0,
         txt_file: bool = False,
-        #nlines: int = 10000,
-        #nstart: int = 10000,
+        nlines: int = None,
+        nstart: int = None,
     ) -> None:
         # filename containing hits data
         self.fname = fname
@@ -95,28 +95,47 @@ class Hits:
 
         # general geant4 simulations
         else:
-            self.detector_hits = pd.read_csv(
-                self.fname,
-                names=["det", "x", "y", "z", "energy", "ID", "name", "x0", "y0", "z0"],
-                dtype={
-                    "det": np.int8,
-                    "x": np.float64,
-                    "y": np.float64,
-                    "z": np.float64,
-                    "energy": np.float64,
-                    "ID": np.int8,
-                    "name": str,
-                    "x0": np.float64,
-                    "y0": np.float64,
-                    "z0": np.float64,
-                },
-                delimiter=",",
-                on_bad_lines="skip",
-                engine="c",
-                #nrows=nlines,
-                #skiprows=range(1, nstart + 1),
-            )
-
+            if nlines:
+                self.detector_hits = pd.read_csv(
+                    self.fname,
+                    names=["det", "x", "y", "z", "energy", "ID", "name", "x0", "y0", "z0"],
+                    dtype={
+                        "det": np.int8,
+                        "x": np.float64,
+                        "y": np.float64,
+                        "z": np.float64,
+                        "energy": np.float64,
+                        "ID": np.int8,
+                        "name": str,
+                        "x0": np.float64,
+                        "y0": np.float64,
+                        "z0": np.float64,
+                    },
+                    delimiter=",",
+                    on_bad_lines="skip",
+                    engine="c",
+                    nrows=nlines,
+                    skiprows=range(1,nstart+1))
+            else:
+                self.detector_hits = pd.read_csv(
+                    self.fname,
+                    names=["det", "x", "y", "z", "energy", "ID", "name", "x0", "y0", "z0"],
+                    dtype={
+                        "det": np.int8,
+                        "x": np.float64,
+                        "y": np.float64,
+                        "z": np.float64,
+                        "energy": np.float64,
+                        "ID": np.int8,
+                        "name": str,
+                        "x0": np.float64,
+                        "y0": np.float64,
+                        "z0": np.float64,
+                    },
+                    delimiter=",",
+                    on_bad_lines="skip",
+                    engine="c",
+                )
             self.n_entries = len(self.detector_hits["det"])
 
         if self.n_entries == 0:
@@ -223,6 +242,10 @@ class Hits:
         energies = []
         vertex = []
         detector_offset = 1111 * 0.45 - (0.03 / 2)  # TODO: make this dynamic
+
+        secondary_e = 0
+        secondary_gamma = 0
+
         for count, el in enumerate(self.detector_hits["det"]):
             # only get hits on the first detector
             if el == 1 and remove_secondaries != True:
@@ -233,7 +256,7 @@ class Hits:
 
                 if (
                     second_axis == "z" and ypos == 0.015
-                ):  # and energy_keV == energy_level:
+                ):
                     posX.append(xpos)
                     posY.append(zpos - detector_offset)
                     energies.append(energy_keV)
@@ -246,11 +269,15 @@ class Hits:
                             ]
                         )
                     )
+                    # add to secondary count -- anything NOT parent
+                    if self.detector_hits["ID"][count] != 0:
+                        if self.detector_hits["name"][count] == "e-":
+                            secondary_e += 1
+                        else:
+                            secondary_gamma += 1
                 elif (
                     second_axis == "y"
-                    and zpos == detector_offset
-                    # and energy_keV == energy_level
-                ):
+                    and zpos == detector_offset):
                     posX.append(xpos)
                     posY.append(ypos)
                     energies.append(energy_keV)
@@ -263,6 +290,12 @@ class Hits:
                             ]
                         )
                     )
+                     # add to secondary count -- anything NOT parent
+                    if self.detector_hits["ID"][count] != 0:
+                        if self.detector_hits["name"][count] == "e-":
+                            secondary_e += 1
+                        else:
+                            secondary_gamma += 1
                 else:
                     pass
 
@@ -280,7 +313,9 @@ class Hits:
                     if (
                         second_axis == "z"
                         and ypos == 0.015
-                        and energy_keV == energy_level
+                        and energy_level - energy_level * 0.05
+                        < energy_keV
+                        < energy_level * 0.05 + energy_level
                     ):
                         posX.append(xpos)
                         posY.append(zpos - detector_offset)
@@ -297,7 +332,9 @@ class Hits:
                     elif (
                         second_axis == "y"
                         and zpos == detector_offset
-                        and energy_keV == energy_level
+                        and energy_level - energy_level * 0.01
+                        < energy_keV
+                        < energy_level * 0.01 + energy_level
                     ):
                         posX.append(xpos)
                         posY.append(ypos)
@@ -324,7 +361,7 @@ class Hits:
 
         print("processed detector hits")
 
-        return hits_dict
+        return hits_dict, secondary_e, secondary_gamma
 
     # get hits simulated in experiment set up in geant4
     def get_experiment_geant4_hits(self) -> dict:

@@ -1,6 +1,25 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from plot_settings import *
+import cmocean
+
+cmap = cmocean.cm.thermal
+import matplotlib.ticker as ticker
+
+def fmt(x, pos):
+    if x == 0:
+        return "0"
+    else:
+        a, b = "{:.1e}".format(x).split("e")
+        b = int(b)
+        a = float(a)
+        if a % 1 > 0.1:
+            pass
+        else:
+            a = int(a)
+        #print(b)
+        return f"{a}"
+
+
 # general detector design
 det_size_cm = 2.19  # cm
 pixel = 0.1  # mm
@@ -16,93 +35,78 @@ thickness = 400  # um
 distance = 2  # cm
 
 thetas = [2.865, 11.305, 19.295, 26.565, 33.025, 33.025, 33.025]
-
+theta = 33.025
 # Set the number of rows and columns in the subplot grid
 rows, cols = 1, 3
 
 # Create subplots and plot arrays
-fig, axes = plt.subplots(rows, cols, figsize=(7, 2),sharex=True)
+fig, axes = plt.subplots(rows, cols, figsize=(5.7, 3),sharex=True)
 
-# ------------------- simulation parameters ------------------
-for n in [1]:
-    if n == 0:
-        area = 1.095
-        n_elements_original = 1
-    else:
-        area = 2.445
-        n_elements_original = 73
+area = 2.445
+n_elements_original = 73
 
-    for ii, theta in enumerate(thetas[-3:]):
+def resample(array):
+    original_size = len(array)
 
-        n_particles = int((3e8* (area * 2) ** 2) * (1 - np.cos(np.deg2rad(theta))))
+    new_array = np.zeros((len(array) // 3, len(array) // 3))
 
-        formatted_theta = "{:.0f}p{:02d}".format(int(theta), int((theta % 1) * 100))
-        if n == 0:
-            fname_tag = f"{n_elements_original}-{distance}-{formatted_theta}-deg-circle-pinhole-c"
-        else:
-            if ii > 0:
-                fname_tag = f"{n_elements_original}-{distance}-{formatted_theta}-deg-circle-rotate-0"
-            else:
-                fname_tag = f"{n_elements_original}-{distance}-{formatted_theta}-deg-circle"
+    for i in range(0, original_size, 3):
+        k = i // 3
+        for j in range(0, original_size, 3):
+            n = j // 3
+            new_array[k, n] = np.sum(array[i : i + 3, j : j + 3])
+    array = new_array
+    return array 
 
-        fname = f"../simulation-results/rings/final_image/{fname_tag}_{n_particles:.2E}_{energy_type}_{energy_level}_dc.txt"
+n_particles = int((3e8* (area * 2) ** 2) * (1 - np.cos(np.deg2rad(theta))))
+formatted_theta = "{:.0f}p{:02d}".format(int(theta), int((theta % 1) * 100))
 
-        if ii != 2:
-            array = np.loadtxt(fname) 
+fname_tag = f"{n_elements_original}-{distance}-{formatted_theta}-deg-circle-rotate-0"
+fname = f"../simulation-results/rings/final_image/{fname_tag}_{n_particles:.2E}_{energy_type}_{energy_level}_dc.txt"
+rot_array = np.loadtxt(fname) 
+cax = axes[0].imshow(resample(rot_array), cmap=cmap)
+axes[0].axis('off')
+axes[0].set_title('Mask',fontsize=8,pad=0.02)
 
-            ax = axes[ii]
+cbar = plt.colorbar(cax, ax=axes[0], pad=0.01,orientation='horizontal')
+tick_locator = ticker.MaxNLocator(nbins=3)
+cbar.locator = tick_locator
+cbar.update_ticks()
+cbar.ax.xaxis.set_major_formatter(ticker.FuncFormatter(fmt))
+cbar.ax.tick_params(axis='x', labelsize=8)
+#axes[0].text(1.21, -0.005, rf'$\times 10^{int(5)}$', ha='right', va='top', transform=axes[0].transAxes, fontsize=8)
+#axes[0].text(0.1, 0.97, "a)", color='white', ha='right', va='top', transform=axes[0].transAxes, fontsize=10)
 
-            cax = ax.imshow(array, cmap=cmap)
-            cbar = fig.colorbar(cax,ax=ax,shrink=0.5,orientation="horizontal",pad=0.01)
-            cbar.formatter.set_powerlimits((0,0))
-            ax.axis('off')
-        else:
-            ax = axes[ii]
 
-            cax = ax.imshow(final_array, cmap=cmap)
-            cbar = fig.colorbar(cax,ax=ax,shrink=0.5,orientation="horizontal",pad=0.01)
-            cbar.formatter.set_powerlimits((0,0))
-            ax.axis('off')
+fname_tag = f"{n_elements_original}-{distance}-{formatted_theta}-deg-circle"
+fname = f"../simulation-results/rings/final_image/{fname_tag}_{n_particles:.2E}_{energy_type}_{energy_level}_dc.txt"
+array = np.loadtxt(fname) 
+cax = axes[1].imshow(resample(array), cmap=cmap)
+axes[1].axis('off')
+axes[1].set_title('Anti-Mask',fontsize=8,pad=0.02)
+cbar = plt.colorbar(cax, ax=axes[1], pad=0.01,orientation='horizontal')
+tick_locator = ticker.MaxNLocator(nbins=3)
+cbar.locator = tick_locator
+cbar.update_ticks()
+cbar.ax.xaxis.set_major_formatter(ticker.FuncFormatter(fmt))
+cbar.ax.tick_params(axis='x', labelsize=8)
+axes[1].text(0.98, -0.2, rf'$\times 10^{int(5)}$ Reconstructed Signal', ha='right', va='top', transform=axes[1].transAxes, fontsize=8)
+#cbar.set_label("Reconstructed Signal",fontsize=8)
+#axes[1].text(0.1, 0.97, "b)", color='white', ha='right', va='top', transform=axes[1].transAxes, fontsize=10)
 
-        if ii == 0:
-            rot_array = array
-        else:
-            final_array = rot_array + array
+
+signal = rot_array+array
+cax = axes[2].imshow(resample(signal), cmap=cmap)
+axes[2].axis('off')
+axes[2].set_title('Summed',fontsize=8,pad=0.02)
+cbar = plt.colorbar(cax, ax=axes[2], pad=0.01,orientation='horizontal')
+tick_locator = ticker.MaxNLocator(nbins=3)
+cbar.locator = tick_locator
+cbar.update_ticks()
+cbar.ax.xaxis.set_major_formatter(ticker.FuncFormatter(fmt))
+cbar.ax.tick_params(axis='x', labelsize=8)
+#axes[2].text(1.21, -0.005, rf'$\times 10^{int(5)}$', ha='right', va='top', transform=axes[2].transAxes, fontsize=8)
+#axes[2].text(0.1, 0.97, "c)", color='white', ha='right', va='top', transform=axes[2].transAxes, fontsize=10)
 
 plt.tight_layout(rect=[0, 0, 1, 0.96])
-plt.savefig("../simulation-results/rings/final_image/circles.png",dpi=300)
-
-signal = final_array
-pixel_count = int(73*3)
-max_value = np.max(signal)
-signal_count = 0
-total_count = 0
-center_pixel = int(218/2)
-geometric_factor = 2.19409
-
-for x in range(pixel_count):
-    for y in range(pixel_count):
-
-        relative_x = (x - center_pixel) * pixel_size
-        relative_y = (y - center_pixel) * pixel_size
-
-        aa = np.sqrt(relative_x**2 + relative_y**2)
-
-        # find the geometrical theta angle of the pixel
-        angle = np.arctan(aa / distance)
-
-        # signal[y,x] > max_value / 4 and 
-
-        if np.rad2deg(angle) < (theta+0.1):# and np.rad2deg(angle) > (theta - 0.4):
-            signal_count += 1
-            total_count += signal[y,x]
-
-
-            #plt.gca().add_patch(rect)
-
-#plt.imshow(signal, cmap=cmap)
-#plt.colorbar()
-#plt.show()
-
-px_factor = signal_count / (pixel_count**2)
-print("recorded flux", total_count  / (geometric_factor * px_factor))
+plt.savefig('8_second_order.png', dpi=500,bbox_inches='tight',pad_inches=0.02)

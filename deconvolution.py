@@ -51,7 +51,7 @@ class Deconvolution:
             self.element_size_mm = 1.21
             self.n_pixels = 256  # minpix EDU
             self.pixel_size = 0.0055  # minpix EDU
-        
+
         self.pinhole = False
         return
 
@@ -101,7 +101,6 @@ class Deconvolution:
         returns:
             heatmap: 2d histogram of hits
         """
-
 
         xxes = [p[0] for p in self.hits_dict["Position"]]
         yxes = [p[1] for p in self.hits_dict["Position"]]
@@ -253,11 +252,13 @@ class Deconvolution:
 
         # mismatched
         if rotate:
-            self.rawIm = np.fliplr(np.flipud(self.rawIm)) # also include the flip lr for 73 ??? 
-            #self.decoder = decoder * -1
+            self.rawIm = np.flipud(self.rawIm)
+            # also include the flip lr for 73 ???
+            # self.decoder = decoder * -1
             self.decoder = decoder
         else:
-            self.decoder = decoder
+            self.rawIm = np.flipud(self.rawIm)
+            self.decoder = decoder * -1
 
         return decoder
 
@@ -457,7 +458,8 @@ class Deconvolution:
         rotate: bool = False,
         correct_collimation: bool = False,
         delta_decoding: bool = True,
-        apply_noise: bool = True,
+        apply_noise: bool = False,
+        resample_array: bool = False,
     ) -> bool:
         """
         perform all the steps to deconvolve a raw image
@@ -506,6 +508,9 @@ class Deconvolution:
 
         if apply_noise:
             self.apply_ps_noise()
+
+        if resample_array:
+            self.raw_heatmap = self.resample(self.raw_heatmap)
 
         if plot_raw_heatmap:
             self.plot_heatmap(self.raw_heatmap, save_name=save_raw_heatmap, vmax=vmax)
@@ -587,13 +592,13 @@ class Deconvolution:
         return
 
     def apply_ps_noise(self):
-        noise_mask = np.random.poisson(self.raw_heatmap)
+        #noise_mask = np.random.poisson(self.raw_heatmap)
 
-        self.raw_heatmap = self.raw_heatmap + noise_mask
-        detector_noise = self.dark_current(self.raw_heatmap, 100/(219**2))
+        #self.raw_heatmap = self.raw_heatmap + noise_mask
+        detector_noise = self.dark_current(self.raw_heatmap, 10000 / (59**2))
         self.raw_heatmap += detector_noise
-        # self.raw_heatmap = random_noise(self.raw_heatmap, mode="poisson")
-        # self.raw_heatmap = apply_poisson_noise(self.raw_heatmap, seed=1)
+        #self.raw_heatmap = random_noise(self.raw_heatmap, mode="poisson")
+        #self.raw_heatmap = apply_poisson_noise(self.raw_heatmap, seed=1)
 
     # https://mwcraig.github.io/ccd-as-book/01-03-Construction-of-an-artificial-but-realistic-image.html
 
@@ -698,9 +703,9 @@ class Deconvolution:
         ax.set_ylabel("pixel")
         ax.set_zlabel("signal")
         # ax.set_zlim([np.amax(heatmap) / 2, np.amax(heatmap)])
-        plt.show()
-        plt.clf()
-        # plt.savefig(save_name, dpi=300)
+        #plt.show()
+        #plt.clf()
+        plt.savefig(save_name, dpi=300)
 
     def calculate_fwhm(self, direction, max_index, scale):
         def gaussian2d(xy, xo, yo, sigma_x, sigma_y, amplitude, offset):
@@ -773,7 +778,6 @@ class Deconvolution:
             img_clipped = img[
                 max_index[0] - sect : max_index[0] + sect + 1, max_index[1] - sect :
             ]
-
             missing_cols = img_bound - max_index[1]
             missing_signal = img[
                 max_index[0] - sect : max_index[0] + sect + 1,
@@ -803,8 +807,14 @@ class Deconvolution:
                 max_index[1] - sect : max_index[1] + sect + 1,
             ]
 
-        #self.plot_3D_signal(img_clipped)
+        if max_index[0] > 52 or max_index[1] > 52:
+            img_clipped = img[max_index[0]-5:max_index[0]+5+1,max_index[1]-5:max_index[1]+5+1]
+            print('special')
+        if max_index[0] > 54 or max_index[1] > 54:
+            img_clipped = img[:6,52:58]
+            print('special')
 
+        #self.plot_3D_signal(img_clipped,save_name='3d.png')
         FWHM, params = getFWHM_GaussianFitScaledAmp(img_clipped, direction)
 
         # for plotting if interested
@@ -818,7 +828,6 @@ class Deconvolution:
                 + ((y - ycenter) ** 2) / (2 * sigmaY**2)
             )
         )
-
 
         return FWHM
 
@@ -917,6 +926,23 @@ class Deconvolution:
         self.lr_image = lr_image
 
         self.plot_heatmap(lr_image, save_name)
+
+    def resample(self, array):
+        # resample the array into desired size
+
+        original_size = len(array)
+
+        multiplier = original_size // self.downsample
+
+        new_array = np.zeros((len(array) // multiplier, len(array) // multiplier))
+
+        for i in range(0, original_size, multiplier):
+            k = i // multiplier
+            for j in range(0, original_size, multiplier):
+                n = j // multiplier
+                new_array[k, n] = np.sum(array[i : i + multiplier, j : j + multiplier])
+
+        return new_array
 
     def reverse_raytrace(self):
         # attempt to reverse ray trace each pixel through each coded aperture hole

@@ -7,28 +7,54 @@ plt.rcParams.update({'font.size': 14})
 """plot the size of the fully and partialy coded fov
 """
 
-det_size_cm = 1.408 # cm
-distances = np.flip(np.linspace(0.1*2*det_size_cm,10*2*det_size_cm,50))
-distances = np.array([2])
-fnumber = distances / (2*det_size_cm)
+def fcfov_plane(detector_size_mm: float, mask_size_mm: float, mask_detector_distance_mm: float, mask_plane_distance_mm: float):
+    detector_diagonal_mm = detector_size_mm * np.sqrt(2)
+    mask_diagonal_mm = mask_size_mm * np.sqrt(2)
 
-hex_list = ["#023047","#219EBC","#FFB703","#FB8500","#F15025"]
-triangle = 5 * det_size_cm / 2
-triangle_2 = det_size_cm / 2
-fov = np.arctan(triangle / distances)
-fcfov = np.arctan(triangle_2 / distances)
+    detector_half_diagonal_mm = detector_diagonal_mm / 2
+    mask_half_diagonal_mm  = mask_diagonal_mm / 2
 
-pcfov = fov - fcfov
-fig, ax = plt.subplots()
-#plt.plot(fnumber,2*np.rad2deg(pcfov))
-plt.plot(fnumber,2*np.rad2deg(fcfov),color=hex_list[-1])
-plt.plot(fnumber,2*np.rad2deg(fov),color=hex_list[0])
-ax.fill_between(fnumber, 2*np.rad2deg(fcfov), 0, color=hex_list[-1], alpha=.1)
-ax.fill_between(fnumber, 2*np.rad2deg(pcfov)+2*np.rad2deg(fcfov), 2*np.rad2deg(fcfov), color=hex_list[1], alpha=.1)
-plt.xlabel('F-number')
-plt.ylabel('FOV [deg]')
-plt.xlim([0,6])
-plt.savefig('fov.png',dpi=300)
+    # FCFOV half angle
+    theta_fcfov_deg = np.rad2deg(np.arctan((mask_half_diagonal_mm - detector_half_diagonal_mm ) / mask_detector_distance_mm))
+    print(theta_fcfov_deg, "half angle")
+
+    # pcfov
+    fov = np.rad2deg(np.arctan((detector_diagonal_mm + (mask_half_diagonal_mm - detector_half_diagonal_mm))  / mask_detector_distance_mm))
+    print("PCFOV", fov - theta_fcfov_deg, "Half angle pcfov")
+    # project this to a distance
+    plane_distance_to_detector_mm = mask_detector_distance_mm + mask_plane_distance_mm
+
+    additional_diagonal_mm = np.tan(np.deg2rad(theta_fcfov_deg)) * plane_distance_to_detector_mm
+
+    plane_diagonal_mm = (additional_diagonal_mm + detector_half_diagonal_mm) * 2
+
+    plane_side_length_mm = plane_diagonal_mm / np.sqrt(2)
+
+    # geant asks for half side length
+
+    plane_half_side_length_mm = plane_side_length_mm / 2
+
+    print(f"FCFOV square plane should be half side length = {plane_half_side_length_mm} mm at a distance {plane_distance_to_detector_mm} mm from detector")
+    
+    pcfov = fov-theta_fcfov_deg
+    return pcfov, theta_fcfov_deg
+
+detector_size_mm = 49.56
+mask_size_mm = 98.28
+mask_detector_distance_mm = 34.7
+element_size_mm = 0.84
+mask_plane_distance_mm = 0.15 + 1.0074 + 0.5
+
+mask_detector_distance_mms = np.linspace(1,100,50)
+
+fcfovs = []
+pcfovs = []
+fovs = []
+for mask_detector_distance_mm in mask_detector_distance_mms:
+    pcfov, fcfov = fcfov_plane(detector_size_mm, mask_size_mm, mask_detector_distance_mm, mask_plane_distance_mm)
+    fcfovs.append(fcfov)
+    pcfovs.append(pcfov)
+    fovs.append(pcfov/(fcfov/2))
 
 fig, ax = plt.subplots()
 ax.set_facecolor('black')
@@ -44,8 +70,11 @@ ax.yaxis.label.set_color('white')
 ax.xaxis.label.set_color('white')
 
 
-plt.plot(fnumber,2*np.rad2deg(pcfov)/(2*np.rad2deg(fcfov)),color='white')
+plt.plot(mask_detector_distance_mms,pcfovs,color='white')
+plt.plot(mask_detector_distance_mms,fcfovs,color='blue')
+plt.plot(mask_detector_distance_mms,fovs,color='pink')
+
 plt.xlabel('F-number')
 plt.ylabel('PCFOV/FCFOV')
-plt.xlim([0,6])
+
 plt.savefig('fov_ratio.png',dpi=300)

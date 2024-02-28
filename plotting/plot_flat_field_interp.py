@@ -5,15 +5,15 @@ from scipy.optimize import curve_fit
 from scipy.io import savemat
 
 # Load x and y values from separate text files
-txt_folder = "/home/rileyannereid/workspace/geant4/simulation-results/47-2-15/"
+txt_folder = "/home/rileyannereid/workspace/geant4/simulation-results/59-fwhm/"
 
-maxpixel = 63
-num_points = 11
-maxgrid  = 126
-px_int = 7
+maxpixel = 58//2
+px_int = 2
+num_points = 13
+maxgrid  = 27
 
 hits = True
-remove_edges = True
+remove_edges = False
 
 if remove_edges:
     edges_str = "edges-removed"
@@ -83,19 +83,22 @@ stacked_zz = np.hstack((reverse_zz, zz[1:]))
 
 # we only need stacked zz now
 main_diagonal = np.array([(i - maxpixel, i - maxpixel) for i in range(0, maxgrid+px_int, px_int)])
-main_diagonal = main_diagonal[1:-1]
+main_diagonal = main_diagonal[:-1]
+main_diagonal = [[i,i] for i in range(0,59//2 - 4,2)]
+main_diagonal = np.vstack((-1*np.flip(main_diagonal[1:]),main_diagonal))
 
 diagonal_radial = np.array([np.sqrt(md[0]**2 + md[1]**2) for md in main_diagonal])
+
 # okay now we have the function
 def polynomial_function(x, *coefficients):
     return np.polyval(coefficients, x)
 
 # Fit the curve with a polynomial of degree 3 (you can adjust the degree)
-degree = 3
+degree = 2
 initial_guess = np.ones(degree + 1)  # Initial guess for the polynomial coefficients
 params, covariance = curve_fit(polynomial_function, diagonal_radial, stacked_zz, p0=initial_guess)
-
-width, height = 141,141
+print(params)
+width, height = 59,59
 x = np.linspace(0, width - 1, width)
 y = np.linspace(0, height - 1, height)
 x, y = np.meshgrid(x, y)
@@ -104,8 +107,8 @@ x, y = np.meshgrid(x, y)
 center_x, center_y = width // 2, height // 2
 distance = np.sqrt((x - center_x)**2 + (y - center_y)**2)
 
-new_z = polynomial_function(distance, *params)
-
+new_z = polynomial_function(59*np.sqrt(2)/2, *params)
+print(new_z)
 np.savetxt(
     f"{output_name}_1d.txt",
     new_z,
