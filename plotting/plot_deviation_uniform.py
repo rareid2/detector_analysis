@@ -186,8 +186,8 @@ for i, n in enumerate(n_p):
         )
 
         axs[j, i].plot(bins[:-1], normed_flux, color=colors[j], linewidth=2)
-        y_upper = normed_flux + np.array(stds) / max(fluxes)
-        y_lower = normed_flux - np.array(stds) / max(fluxes)
+        y_upper = normed_flux + (np.array(stds) / max(fluxes))
+        y_lower = normed_flux - (np.array(stds) / max(fluxes))
 
         axs[j, i].fill_between(
             bins[:-1],

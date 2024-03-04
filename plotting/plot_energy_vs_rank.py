@@ -9,7 +9,7 @@ from matplotlib.colors import LinearSegmentedColormap
 W_rho = 19.3  # g/cm^3
 
 # find data file
-fname = "stoppingpower_W.txt"
+fname = "../coded_aperture_mask_designs/stopping_power_data/stoppingpower_W.txt"
 file1 = open(fname, "r")
 Lines = file1.readlines()
 
@@ -35,7 +35,7 @@ energies = np.array(energies) * 1000  # convert to keV
 from scipy.interpolate import interp1d
 
 linear_interp = interp1d(energies, ranges, kind="linear", fill_value="extrapolate")
-
+print(linear_interp(6000))
 energies_plot = np.logspace(1, 4, 40)  # keV
 
 detector_size_mm = 50

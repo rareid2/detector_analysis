@@ -592,13 +592,13 @@ class Deconvolution:
         return
 
     def apply_ps_noise(self):
-        #noise_mask = np.random.poisson(self.raw_heatmap)
+        # noise_mask = np.random.poisson(self.raw_heatmap)
 
-        #self.raw_heatmap = self.raw_heatmap + noise_mask
+        # self.raw_heatmap = self.raw_heatmap + noise_mask
         detector_noise = self.dark_current(self.raw_heatmap, 10000 / (59**2))
         self.raw_heatmap += detector_noise
-        #self.raw_heatmap = random_noise(self.raw_heatmap, mode="poisson")
-        #self.raw_heatmap = apply_poisson_noise(self.raw_heatmap, seed=1)
+        # self.raw_heatmap = random_noise(self.raw_heatmap, mode="poisson")
+        # self.raw_heatmap = apply_poisson_noise(self.raw_heatmap, seed=1)
 
     # https://mwcraig.github.io/ccd-as-book/01-03-Construction-of-an-artificial-but-realistic-image.html
 
@@ -703,8 +703,8 @@ class Deconvolution:
         ax.set_ylabel("pixel")
         ax.set_zlabel("signal")
         # ax.set_zlim([np.amax(heatmap) / 2, np.amax(heatmap)])
-        #plt.show()
-        #plt.clf()
+        # plt.show()
+        # plt.clf()
         plt.savefig(save_name, dpi=300)
 
     def calculate_fwhm(self, direction, max_index, scale):
@@ -807,14 +807,20 @@ class Deconvolution:
                 max_index[1] - sect : max_index[1] + sect + 1,
             ]
 
-        if max_index[0] > 52 or max_index[1] > 52:
-            img_clipped = img[max_index[0]-5:max_index[0]+5+1,max_index[1]-5:max_index[1]+5+1]
-            print('special')
-        if max_index[0] > 54 or max_index[1] > 54:
-            img_clipped = img[:6,52:58]
-            print('special')
+        if max_index[0] > 55 or max_index[1] > 55:
+            img_clipped = img[
+                max_index[0] - 5 : max_index[0] + 5 + 1,
+                max_index[1] - 5 : max_index[1] + 5 + 1,
+            ]
+            print("special")
+        if max_index[0] > 56 or max_index[1] > 56:
+            img_clipped = img[
+                max_index[0] - 3 : max_index[0] + 4,
+                max_index[1] - 3 : max_index[1] + 4,
+            ]
+            print("special")
 
-        #self.plot_3D_signal(img_clipped,save_name='3d.png')
+        # self.plot_3D_signal(img_clipped,save_name='3d.png')
         FWHM, params = getFWHM_GaussianFitScaledAmp(img_clipped, direction)
 
         # for plotting if interested

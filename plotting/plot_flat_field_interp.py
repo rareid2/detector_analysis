@@ -5,14 +5,14 @@ from scipy.optimize import curve_fit
 from scipy.io import savemat
 
 # Load x and y values from separate text files
-txt_folder = "/home/rileyannereid/workspace/geant4/simulation-results/59-fwhm/"
+txt_folder = "/home/rileyannereid/workspace/geant4/simulation-results/61-fwhm/"
 
-maxpixel = 58//2
-px_int = 2
-num_points = 13
-maxgrid  = 27
+maxpixel = 61 // 2
+px_int = 3
+num_points = 8
+maxgrid = 27
 
-hits = True
+hits = False
 remove_edges = False
 
 if remove_edges:
@@ -28,10 +28,9 @@ data_product = "fwhm"
 output_name = f"{txt_folder}{data_product}_interp_grid_{hits_str}_{edges_str}"
 
 # load data
-#zx = np.loadtxt(f"{txt_folder}x-{data_product}.txt")
-#zy = np.loadtxt(f"{txt_folder}y-{data_product}.txt")
+# zx = np.loadtxt(f"{txt_folder}x-{data_product}.txt")
+# zy = np.loadtxt(f"{txt_folder}y-{data_product}.txt")
 zz = np.loadtxt(f"{txt_folder}xy-{data_product}.txt")
-
 zc = np.loadtxt(f"{txt_folder}0-{data_product}.txt")
 zc = float(zc)
 
@@ -52,67 +51,73 @@ if hits and data_product == "signal":
     zz = np.insert(zz, 0, 1)
 
 elif data_product == "signal":
-    #zx = np.array([(z / zc) for z in zx])
-    #zy = np.array([(z / zc) for z in zy])
+    # zx = np.array([(z / zc) for z in zx])
+    # zy = np.array([(z / zc) for z in zy])
     zz = np.array([(z / zc) for z in zz])
-    #zx = np.insert(zx, 0, 1)
-    #zy = np.insert(zy, 0, 1)
+    # zx = np.insert(zx, 0, 1)
+    # zy = np.insert(zy, 0, 1)
     zz = np.insert(zz, 0, 1)
 
 else:
     # add in central fwhm or central hits ratio
-    #zx = np.insert(zx, 0, zc)
-    #zy = np.insert(zy, 0, zc)
+    # zx = np.insert(zx, 0, zc)
+    # zy = np.insert(zy, 0, zc)
     zz = np.insert(zz, 0, zc)
 
 if remove_edges:
-    #zx = zx[:-1]
-    #zy = zy[:-1]
+    # zx = zx[:-1]
+    # zy = zy[:-1]
     zz = zz[:-1]
-    #maxpixel -= px_int
+    x_data = np.arange(0, 18, 2)
+    pp = interpolate.interp1d(x_data, zz, kind="linear", fill_value="extrapolate")
+    za = pp(18)
+    zz = np.append(zz, za)
+    # maxpixel -= px_int
 
 # Create an array in reverse order
-#reverse_zx = np.flip(zx)
-#reverse_zy = np.flip(zy)
+# reverse_zx = np.flip(zx)
+# reverse_zy = np.flip(zy)
 reverse_zz = np.flip(zz)
 
 # Stack the input and reverse arrays together
-#stacked_zx = np.hstack((reverse_zx, zx[1:]))
-#stacked_zy = np.hstack((reverse_zy, zy[1:]))
+# stacked_zx = np.hstack((reverse_zx, zx[1:]))
+# stacked_zy = np.hstack((reverse_zy, zy[1:]))
 stacked_zz = np.hstack((reverse_zz, zz[1:]))
 
 # we only need stacked zz now
-main_diagonal = np.array([(i - maxpixel, i - maxpixel) for i in range(0, maxgrid+px_int, px_int)])
+main_diagonal = np.array(
+    [(i - maxpixel, i - maxpixel) for i in range(0, maxgrid + px_int, px_int)]
+)
 main_diagonal = main_diagonal[:-1]
-main_diagonal = [[i,i] for i in range(0,59//2 - 4,2)]
-main_diagonal = np.vstack((-1*np.flip(main_diagonal[1:]),main_diagonal))
+main_diagonal = [[i, i] for i in range(0, (61 // 2), 3)]
+main_diagonal = np.vstack((-1 * np.flip(main_diagonal[1:]), main_diagonal))
+print(main_diagonal)
+diagonal_radial = np.array([np.sqrt(md[0] ** 2 + md[1] ** 2) for md in main_diagonal])
 
-diagonal_radial = np.array([np.sqrt(md[0]**2 + md[1]**2) for md in main_diagonal])
 
 # okay now we have the function
 def polynomial_function(x, *coefficients):
     return np.polyval(coefficients, x)
 
+
 # Fit the curve with a polynomial of degree 3 (you can adjust the degree)
 degree = 2
 initial_guess = np.ones(degree + 1)  # Initial guess for the polynomial coefficients
-params, covariance = curve_fit(polynomial_function, diagonal_radial, stacked_zz, p0=initial_guess)
+params, covariance = curve_fit(
+    polynomial_function, diagonal_radial, stacked_zz, p0=initial_guess
+)
 print(params)
-width, height = 59,59
+width, height = 43, 43
 x = np.linspace(0, width - 1, width)
 y = np.linspace(0, height - 1, height)
 x, y = np.meshgrid(x, y)
 
 # Calculate the distance from the center of the grid
 center_x, center_y = width // 2, height // 2
-distance = np.sqrt((x - center_x)**2 + (y - center_y)**2)
+distance = np.sqrt((x - center_x) ** 2 + (y - center_y) ** 2)
 
-new_z = polynomial_function(59*np.sqrt(2)/2, *params)
+new_z = polynomial_function(distance, *params)
 print(new_z)
-np.savetxt(
-    f"{output_name}_1d.txt",
-    new_z,
-)
 
 # Create a 3D figure
 plt.clf()

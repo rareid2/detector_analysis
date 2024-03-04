@@ -98,7 +98,18 @@ class Hits:
             if nlines:
                 self.detector_hits = pd.read_csv(
                     self.fname,
-                    names=["det", "x", "y", "z", "energy", "ID", "name", "x0", "y0", "z0"],
+                    names=[
+                        "det",
+                        "x",
+                        "y",
+                        "z",
+                        "energy",
+                        "ID",
+                        "name",
+                        "x0",
+                        "y0",
+                        "z0",
+                    ],
                     dtype={
                         "det": np.int8,
                         "x": np.float64,
@@ -115,11 +126,23 @@ class Hits:
                     on_bad_lines="skip",
                     engine="c",
                     nrows=nlines,
-                    skiprows=range(1,nstart+1))
+                    skiprows=range(1, nstart + 1),
+                )
             else:
                 self.detector_hits = pd.read_csv(
                     self.fname,
-                    names=["det", "x", "y", "z", "energy", "ID", "name", "x0", "y0", "z0"],
+                    names=[
+                        "det",
+                        "x",
+                        "y",
+                        "z",
+                        "energy",
+                        "ID",
+                        "name",
+                        "x0",
+                        "y0",
+                        "z0",
+                    ],
                     dtype={
                         "det": np.int8,
                         "x": np.float64,
@@ -228,6 +251,7 @@ class Hits:
         remove_secondaries: bool = False,
         second_axis: str = "y",
         energy_level: float = 500,
+        energy_bin=None,
     ) -> dict:
         """
         return a dictionary containing hits on front detector
@@ -254,9 +278,15 @@ class Hits:
                 zpos = self.detector_hits["z"][count]
                 energy_keV = self.detector_hits["energy"][count]
 
-                if (
-                    second_axis == "z" and ypos == 0.015
-                ):
+                if energy_bin is not None:
+                    if energy_bin[0] < energy_keV < energy_bin[1]:
+                        pass
+                    else:
+                        continue
+                else:
+                    pass
+
+                if second_axis == "z" and ypos == 0.015:
                     posX.append(xpos)
                     posY.append(zpos - detector_offset)
                     energies.append(energy_keV)
@@ -275,9 +305,7 @@ class Hits:
                             secondary_e += 1
                         else:
                             secondary_gamma += 1
-                elif (
-                    second_axis == "y"
-                    and zpos == detector_offset):
+                elif second_axis == "y" and zpos == detector_offset:
                     posX.append(xpos)
                     posY.append(ypos)
                     energies.append(energy_keV)
@@ -290,7 +318,7 @@ class Hits:
                             ]
                         )
                     )
-                     # add to secondary count -- anything NOT parent
+                    # add to secondary count -- anything NOT parent
                     if self.detector_hits["ID"][count] != 0:
                         if self.detector_hits["name"][count] == "e-":
                             secondary_e += 1
@@ -310,13 +338,22 @@ class Hits:
                     zpos = self.detector_hits["z"][count]
                     energy_keV = self.detector_hits["energy"][count]
 
-                    if (
-                        second_axis == "z"
-                        and ypos == 0.015
-                        and energy_level - energy_level * 0.05
-                        < energy_keV
-                        < energy_level * 0.05 + energy_level
-                    ):
+                    if energy_bin is not None:
+                        if energy_bin[0] < energy_keV < energy_bin[1]:
+                            pass
+                        else:
+                            continue
+                    else:
+                        if (
+                            energy_level - energy_level * 0.05
+                            < energy_keV
+                            < energy_level * 0.05 + energy_level
+                        ):
+                            pass
+                        else:
+                            continue
+
+                    if second_axis == "z" and ypos == 0.015:
                         posX.append(xpos)
                         posY.append(zpos - detector_offset)
                         energies.append(energy_keV)
@@ -329,13 +366,7 @@ class Hits:
                                 ]
                             )
                         )
-                    elif (
-                        second_axis == "y"
-                        and zpos == detector_offset
-                        and energy_level - energy_level * 0.01
-                        < energy_keV
-                        < energy_level * 0.01 + energy_level
-                    ):
+                    elif second_axis == "y" and zpos == detector_offset:
                         posX.append(xpos)
                         posY.append(ypos)
                         energies.append(energy_keV)

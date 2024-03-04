@@ -37,27 +37,27 @@ def run_geom_corr(
         )
 
     # general detector design
-    det_size_cm = 4.956  # cm
-    pixel = 0.28 * 3 # mm
+    det_size_cm = 4.941  # cm
+    pixel = 0.81  # mm
     pixel_cm = pixel * 0.1
 
     # ---------- coded aperture set up ---------
     # set number of elements
-    n_elements_original = 59
+    n_elements_original = 61
     multiplier = 1
 
     # focal length
-    distance = 3.47  # cm
+    distance = 1.9764  # cm
 
-    #det_size_cm = 2.82 #4.984  # cm
-    #pixel = 0.2 #0.186666667  # mm
-    #pixel_cm = pixel * 0.1  # cm
+    # det_size_cm = 2.82 #4.984  # cm
+    # pixel = 0.2 #0.186666667  # mm
+    # pixel_cm = pixel * 0.1  # cm
 
     # ---------- coded aperture set up ---------
 
     # set number of elements
-    #n_elements_original = 47 #89
-    #multiplier = 3
+    # n_elements_original = 47 #89
+    # multiplier = 3
 
     element_size = pixel * multiplier
     n_elements = (2 * n_elements_original) - 1
@@ -69,10 +69,10 @@ def run_geom_corr(
 
     # thickness of mask
     det_thickness = 300  # um
-    thickness = 300  # um
+    thickness = 200  # um
 
     # focal length
-    #distance = 2.2 # 4.49  # cm
+    # distance = 2.2 # 4.49  # cm
 
     fake_radius = 1
 
@@ -140,7 +140,7 @@ def run_geom_corr(
 
     # --------------set up source---------------
     energy_type = "Mono"
-    energy_level = 500  # keV
+    energy_level = 0.235  # keV
 
     # --------------set up data naming---------------
     if hitsonly:
@@ -167,7 +167,7 @@ def run_geom_corr(
     # --------------RUN AND PROCESS---------------
     # directory to save results in
     results_save = f"{results_folder}{fname_tag}"
-    #print(np.sum(np.loadtxt(fname)))
+    # print(np.sum(np.loadtxt(fname)))
 
     if simulate and not hitsonly:
         simulation_engine.run_simulation(fname, build=False, rename=True)
@@ -193,10 +193,10 @@ def run_geom_corr(
             plot_conditions=False,
             hits_txt=False,
             delta_decoding=False,
-            rotate=True
+            rotate=True,
         )
         dc_txt = results_save + "_dc.txt"
-        np.savetxt(dc_txt,deconvolver.deconvolved_image)
+        np.savetxt(dc_txt, deconvolver.deconvolved_image)
     elif txt and not hitsonly:
         # dont simulate, process the txt file
         myhits = Hits(fname=fname, experiment=False, txt_file=True)
@@ -216,10 +216,10 @@ def run_geom_corr(
             plot_conditions=False,
             hits_txt=True,
             delta_decoding=False,
-            rotate=True
+            rotate=True,
         )
         dc_txt = results_save + "_dc.txt"
-        np.savetxt(dc_txt,deconvolver.deconvolved_image)
+        np.savetxt(dc_txt, deconvolver.deconvolved_image)
     else:
         # only getting raw hits
         if simulate:
@@ -233,7 +233,7 @@ def run_geom_corr(
             myhits = Hits(fname=fname, experiment=False, txt_file=True)
             hits_len = np.sum(np.loadtxt(fname))
         else:
-            print('RE PROCESSING CSV')
+            print("RE PROCESSING CSV")
             myhits = Hits(fname=fname, experiment=False)
             myhits.get_det_hits(
                 remove_secondaries=False, second_axis="y", energy_level=energy_level
@@ -252,11 +252,11 @@ def run_geom_corr(
                 plot_conditions=False,
                 hits_txt=False,
                 delta_decoding=False,
-                rotate=True
+                rotate=True,
             )
             dc_txt = results_save + "_dc.txt"
-            np.savetxt(dc_txt,deconvolver.deconvolved_image)
-    
+            np.savetxt(dc_txt, deconvolver.deconvolved_image)
+
     if not hitsonly:
         # find the max index
         max_index_flat = np.argmax(deconvolver.deconvolved_image)
@@ -265,7 +265,7 @@ def run_geom_corr(
         )
 
         # shift up to the noise floor so that the noise floor is at 0
-        #deconvolver.shift_noise_floor_ptsrc(max_index_2d[0], max_index_2d[1])
+        # deconvolver.shift_noise_floor_ptsrc(max_index_2d[0], max_index_2d[1])
         max_signal = deconvolver.deconvolved_image[max_index_2d]
 
         if scale is None:
@@ -277,20 +277,20 @@ def run_geom_corr(
     else:
         max_signal = None
         fwhm = None
-    
-    #max_signal = None
-    #fwhm = None
+
+    # max_signal = None
+    # fwhm = None
     return max_signal, fwhm, hits_len
 
 
 # -------- ------- SETUP -------- -------
-data_folder = "/home/rileyannereid/workspace/geant4/simulation-data/59-fwhm/"
-results_folder = "/home/rileyannereid/workspace/geant4/simulation-results/59-fwhm/"
+data_folder = "/home/rileyannereid/workspace/geant4/simulation-data/61-fwhm/"
+results_folder = "/home/rileyannereid/workspace/geant4/simulation-results/61-fwhm/"
 
-maxpixel = 59//2 #71 #134
-pix_int = 2 #8
+maxpixel = 61 // 2  # 71 #134
+pix_int = 3  # 8
 incs = range(pix_int, maxpixel, pix_int)
-niter = 8
+niter = 3
 
 # -------- -------STEP 1 : need to get the raw hits (shielding stays, but no mask) -------- -------
 # need to comment out the physical mask vols in detector construction
@@ -300,7 +300,7 @@ txt = False
 hitsonly = True
 
 if step1:
-    for direction in ["0","xy"]:
+    for direction in ["0", "xy"]:
         allhits = []
         if direction != "0":
             for inc in incs:
@@ -357,13 +357,13 @@ center_hits = None
 include_hits_effect = True
 
 if step2:
-    for direction in ["0","xy"]:
+    for direction in ["0", "xy"]:
         fwhms = []
         signals = []
         if direction != "0":
             if include_hits_effect:
                 hits = np.loadtxt(f"{results_folder}{direction}-hits.txt")
-            for ii, inc in enumerate(incs[:-1]):
+            for ii, inc in enumerate(incs):
                 if include_hits_effect:
                     hit_norm = hits[ii] / center_hits
                 else:
