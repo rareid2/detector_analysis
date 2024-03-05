@@ -118,12 +118,18 @@ for m in range(7):
 
         # --------------set up data naming---------------
         formatted_theta = "{:.0f}p{:02d}".format(int(theta), int((theta % 1) * 100))
-        fname_tag = f"{n_elements_original}-{distance}-{formatted_theta}-deg-{m+2}"
+        fname_tag = "{}-{}-{}-deg-{}".format(
+            n_elements_original, distance, formatted_theta, m + 2
+        )
 
-        fname = f"../simulation-data/rings/{fname_tag}_{n_particles:.2E}_{energy_type}_{energy_level}_{formatted_theta}.csv"
+        fname = "{}_{:.2E}_{}_{}_{}.csv".format(
+            fname_tag, n_particles, energy_type, energy_level, formatted_theta
+        )
 
         if txt:
-            fname = f"../simulation-results/rings/{fname_tag}_{n_particles:.2E}_{energy_type}_{energy_level}_raw.txt"
+            fname = "{}_{:.2E}_{}_{}_raw.txt".format(
+                fname_tag, n_particles, energy_type, energy_level
+            )
 
         simulation_engine.set_macro(
             n_particles=int(n_particles),
@@ -144,8 +150,10 @@ for m in range(7):
 
         # ---------- process results -----------
         # directory to save results in
-        results_dir = "../simulation-results/rings/"
-        results_tag = f"{fname_tag}_{n_particles:.2E}_{energy_type}_{energy_level}"
+        results_dir = ""
+        results_tag = "{}_{:.2E}_{}_{}".format(
+            fname_tag, n_particles, energy_type, energy_level
+        )
         results_save = results_dir + results_tag
 
         if large_file and not txt:
