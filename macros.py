@@ -206,7 +206,7 @@ def write_surface_macro(
     ene_type: str,
     ene_min_keV: float,
     ene_max_keV: float,
-    macro_directory: str = "..EPAD_geant4/macros",
+    macro_directory: str = "../EPAD_geant4/macros",
     progress_mod: int = 1000,
     fname_tag: str = "test",
     theta: float = None,
