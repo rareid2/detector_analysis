@@ -146,7 +146,10 @@ for ii, theta in enumerate(thetas):
 
         # --------------RUN---------------
         if simulate:
-            simulation_engine.run_simulation(fname, build=False, rename=True)
+            if m == 0:
+                simulation_engine.run_simulation(fname, build=True, rename=True)
+            else:
+                simulation_engine.run_simulation(fname, build=True, rename=True)
 
         # ---------- process results -----------
         # directory to save results in
