@@ -8,7 +8,7 @@ from macros import (
 from typing import List, Any
 import os
 
-EPAD_dir = "/home/rileyannereid/workspace/geant4/EPAD_geant4"
+EPAD_dir = "../EPAD_geant4"
 
 
 class SimulationEngine:

@@ -13,13 +13,10 @@ from scipy import interpolate
 from scipy.signal import peak_widths, find_peaks, convolve2d, correlate2d
 import scipy.optimize as opt
 from scipy.io import savemat
-from skimage import color, data, restoration
+
 import math
-import cv2
 import sys
-from pyfftw.interfaces import scipy_fftpack as fftw
-from skimage.util import random_noise
-from photutils.datasets import apply_poisson_noise, make_4gaussians_image
+
 
 sys.path.insert(1, "../coded_aperture_mask_designs")
 from util_fncs import makeMURA, make_mosaic_MURA, get_decoder_MURA, updated_get_decoder

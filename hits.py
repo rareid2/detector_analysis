@@ -3,8 +3,6 @@ import pandas as pd
 import numpy as np
 from experiment_engine import ExperimentEngine
 from uncertainty import add_uncertainty
-from shapely.geometry import Point, Polygon
-
 
 class Hits:
     def __init__(
