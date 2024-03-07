@@ -264,8 +264,29 @@ class SimulationEngine:
             fname: new data file name and location
         returns:
         """
+        folder_path = '../simulation-data/'
+        file_list = os.listdir(folder_path)
 
-        os.rename("../simulation-data/hits.csv", fname)
+        for file_name in file_list:
+            # Check if the file starts with "hits-" and ends with ".csv"
+            if file_name.startswith("hits_") and file_name.endswith(".csv"):
+                # Extract the integer part from the original file name
+                try:
+                    integer_part = int(file_name[5:-4])
+                    
+                    # Construct the new file name with the custom string and the same integer
+                    new_file_name = f'{fname[:-4]}-{integer_part}.csv'
+
+                    # Build the full paths for old and new file names
+                    old_file_path = os.path.join(folder_path, file_name)
+                    new_file_path = os.path.join(folder_path, new_file_name)
+
+                    # Rename the file
+                    os.rename(old_file_path, new_file_path)
+                    print(f'Renamed: {file_name} to {new_file_name}')
+                except ValueError:
+                    # Ignore files that do not have a valid integer part
+                    print(f'Ignored: {file_name} (Invalid integer part)')
 
         return
 

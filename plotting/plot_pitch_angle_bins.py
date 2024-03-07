@@ -105,8 +105,11 @@ for ii, bn in enumerate(bins[:-1]):
     gf_sum_2 += np.sum(np.array(gf_ids[f"{ii}"]))
 
     bin_val = np.sum(np.array(bins_ids[f"{ii}"])) / np.sum(np.array(gf_ids[f"{ii}"]))
-    gf_sum.append(bin_val / 43)
-    total_sum += bin_val / 43
+    gf_sum.append(bin_val)
+    total_sum += bin_val
+
+# trap z
+print("hi", np.trapz(np.array(gf_sum), np.deg2rad(np.array(bins[:-1]))))
 
 print(px_sum, gf_sum_2, total_sum, total_sum / (61**2 / 21.4))
 plt.scatter(bins[:-1], np.array(gf_sum))

@@ -252,12 +252,12 @@ def write_surface_macro(
                 "/gps/pos/halfx 5.054 cm \n"
             )  # 4.875  # 3.72066 # 1.095 # 3.255 # 2.445 5.03 -- use for aperture
             f.write("/gps/pos/halfy 5.054 cm \n")  # 4.875  # 3.72066
-            f.write(f"/gps/pos/centre 0 0 498.9618 cm \n")  # was -5
+            f.write(f"/gps/pos/centre 0 0 496.28 cm \n")  # was -5
         else:
             f.write("/gps/pos/type Surface \n")
             f.write("/gps/pos/shape Sphere \n")
             f.write(f"/gps/pos/radius {radius_cm} cm \n")
-            f.write(f"/gps/pos/centre 0 0 498.9618 cm \n")
+            f.write(f"/gps/pos/centre 0 0 496.28 cm \n")
 
         # center chosen to align with pinhole (maybe change this?)
         # 499.935 is the front face of detector 1

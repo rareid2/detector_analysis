@@ -7,7 +7,7 @@ from macros import find_disp_pos
 import numpy as np
 import os
 import subprocess
-
+import copy
 from scipy.io import savemat
 from itertools import cycle
 import matplotlib.pyplot as plt
@@ -34,7 +34,7 @@ def resample(array):
 
 
 simulation_engine = SimulationEngine(construct="CA", source="PS", write_files=True)
-
+nthreads = 40
 txt = False
 simulate = True
 large_file = False
@@ -64,7 +64,7 @@ thickness = 300  # um
 distance = 3.47  # cm
 
 thetas = [2, 13, 24, 35, 46]
-
+thetas = [35]
 n_p = 5e7
 # 1.5e7
 # 5e7
@@ -73,29 +73,29 @@ n_p = 5e7
 """
 for ii, theta in enumerate(thetas):
     raw_hits = np.zeros((59, 59))
-    for m in [0, 1, 2]:
+    for m in range(6):
         energy_type = "Mono"
         energy_level = 500  # keV
         n_particles = int((n_p * (5.265 * 2) ** 2) * (1 - np.cos(np.deg2rad(theta))))
 
         # load the 3
         formatted_theta = "{:.0f}p{:02d}".format(int(theta), int((theta % 1) * 100))
-        if m == 2:
-            fname_tag = f"{n_elements_original}-{distance}-{formatted_theta}-deg"
-        else:
-            fname_tag = f"{n_elements_original}-{distance}-{formatted_theta}-deg-{m}"
+        fname_tag = f"{n_elements_original}-{distance}-{formatted_theta}-deg-{m}"
         fname = f"../simulation-results/rings/{fname_tag}_{n_particles:.2E}_{energy_type}_{energy_level}_raw.txt"
         if theta > 33 and m == 2:
             raw_hits += resample(np.loadtxt(fname))
         else:
             raw_hits += np.loadtxt(fname)
         print(m, theta)
-    fname_tag = f"{n_elements_original}-{distance}-{formatted_theta}-deg-combined"
+    fname_tag = (
+        f"{n_elements_original}-{distance}-{formatted_theta}-deg-combined-10-sim"
+    )
     fname = f"../simulation-results/rings/{fname_tag}_{n_particles:.2E}_{energy_type}_{energy_level}_raw.txt"
     np.savetxt(fname, raw_hits)
 """
-for m in range(7):
-    for ii, theta in enumerate(thetas):
+# for m in range(7):
+for ii, theta in enumerate(thetas):
+    for m in range(7):
         n_particles = int((n_p * (5.265 * 2) ** 2) * (1 - np.cos(np.deg2rad(theta))))
         # --------------set up simulation---------------
         simulation_engine.set_config(
@@ -118,16 +118,16 @@ for m in range(7):
 
         # --------------set up data naming---------------
         formatted_theta = "{:.0f}p{:02d}".format(int(theta), int((theta % 1) * 100))
-        fname_tag = "{}-{}-{}-deg-{}".format(
+        fname_tag = "{}-{}-{}-deg-test-{}".format(
             n_elements_original, distance, formatted_theta, m + 2
         )
 
-        fname = "{}_{:.2E}_{}_{}_{}.csv".format(
+        fname = "../simulation-data/rings/{}_{:.2E}_{}_{}_{}.csv".format(
             fname_tag, n_particles, energy_type, energy_level, formatted_theta
         )
 
         if txt:
-            fname = "{}_{:.2E}_{}_{}_raw.txt".format(
+            fname = "../simulation-results/rings/{}_{:.2E}_{}_{}_raw.txt".format(
                 fname_tag, n_particles, energy_type, energy_level
             )
 
@@ -150,7 +150,7 @@ for m in range(7):
 
         # ---------- process results -----------
         # directory to save results in
-        results_dir = ""
+        results_dir = "../simulation-results/rings/"
         results_tag = "{}_{:.2E}_{}_{}".format(
             fname_tag, n_particles, energy_type, energy_level
         )
@@ -168,13 +168,28 @@ for m in range(7):
             np.savetxt(results_save + "_raw.txt", raw_hits)
             txt = True
             fname = results_save + "_raw.txt"
-
-        myhits = Hits(fname=fname, experiment=False, txt_file=txt)
+        
         if not txt:
-            _, sec_brehm, sec_e = myhits.get_det_hits(
-                remove_secondaries=False, second_axis="y", energy_level=energy_level
-            )
-            print(sec_brehm, sec_e, len(myhits.hits_dict["Position"]))
+            for hi in range(nthreads):
+                print(hi)
+                fname_hits = fname[:-4] + "-{}.csv".format(hi)
+                myhits = Hits(fname=fname_hits, experiment=False, txt_file=txt)
+                hits_dict, sec_brehm, sec_e = myhits.get_det_hits(
+                    remove_secondaries=False, second_axis="y", energy_level=energy_level
+                )
+                print(sec_brehm, sec_e, len(myhits.hits_dict["Position"]))
+                if hi != 0:
+                    # update fields in hits dict
+                    myhits.hits_dict["Position"].extend(hits_copy.hits_dict["Position"])
+                    myhits.hits_dict["Energy"].extend(hits_copy.hits_dict["Energy"])
+                    myhits.hits_dict["Vertices"].extend(hits_copy.hits_dict["Vertices"])
+
+                    hits_copy = copy.copy(myhits)
+                else:
+                    hits_copy = copy.copy(myhits)
+
+        else:
+            myhits = Hits(fname=fname, experiment=False, txt_file=txt)
 
         # deconvolution steps
         deconvolver = Deconvolution(myhits, simulation_engine)

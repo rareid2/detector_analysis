@@ -156,14 +156,10 @@ for i, n in enumerate(n_p):
         # now get STD
         for ii, bn in enumerate(bins[:-1]):
             fluxes.append(
-                np.average(np.array(bins_ids[f"{ii}"]))
-                / np.average(np.array(gf_ids[f"{ii}"]))
+                np.average(np.array(bins_ids[f"{ii}"]) / (np.array(gf_ids[f"{ii}"])))
             )
-            # print(np.average(np.array(gf_ids[f"{ii}"])))
             stds.append(
-                np.std(
-                    np.array(bins_ids[f"{ii}"]) / np.average(np.array(gf_ids[f"{ii}"]))
-                )
+                np.std(np.array(bins_ids[f"{ii}"]) / (np.array(gf_ids[f"{ii}"])))
             )
             if bins[ii] < theta:
                 uniformed.append(1)
