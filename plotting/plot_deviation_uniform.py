@@ -41,7 +41,7 @@ fig, axs = plt.subplots(
 )
 
 thetas = [2, 13, 24, 35, 46]
-n_p = [5e6, 1.5e7, 5e7]
+n_p = [5e6, 5e7, 5e8]
 fcfov = 44.79
 distance = 3.47
 
@@ -90,6 +90,9 @@ while pixel_size * fwhm_step < max_rad_dist:
 bins.insert(0, 0)
 # bins = bins[::2]
 bins = bins[:-1]
+
+# clean averaged bin
+bins = np.linspace(0, 46, 30)
 print(bins)
 for i, n in enumerate(n_p):
     for j, theta in enumerate(thetas):
@@ -155,13 +158,9 @@ for i, n in enumerate(n_p):
                             gf_ids[f"{ii}"].append(gf_grid[y, x])
         # now get STD
         for ii, bn in enumerate(bins[:-1]):
-            fluxes.append(
-                np.average(np.array(bins_ids[f"{ii}"]) / (np.array(gf_ids[f"{ii}"])))
-            )
-            stds.append(
-                np.std(np.array(bins_ids[f"{ii}"]) / (np.array(gf_ids[f"{ii}"])))
-            )
-            if bins[ii] < theta:
+            fluxes.append(np.average(np.array(bins_ids[f"{ii}"])))
+            stds.append(np.std(np.array(bins_ids[f"{ii}"])))
+            if bins[ii + 1] < theta:
                 uniformed.append(1)
             else:
                 uniformed.append(0)
@@ -198,13 +197,13 @@ for i, n in enumerate(n_p):
         axs[j, i].tick_params(axis="x", labelsize=8)
 
 # for i in range(5):
-axs[2, 0].set_ylabel("Normalized Fluence", rotation="vertical", fontsize=10)
+axs[2, 0].set_ylabel("Normalized Counts", rotation="vertical", fontsize=10)
 axs[2, 0].yaxis.labelpad = 0.2
 
 # Add subtitles to the left of each row
 row_titles = [
+    r"$\sim$8$\times$10$^7$cm$^{-2}$sr$^{-1}$",
     r"$\sim$8$\times$10$^6$cm$^{-2}$sr$^{-1}$",
-    r"$\sim$2$\times$10$^6$cm$^{-2}$sr$^{-1}$",
     r"$\sim$8$\times$10$^5$cm$^{-2}$sr$^{-1}$",
 ]
 for j in range(3):
