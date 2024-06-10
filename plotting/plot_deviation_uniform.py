@@ -51,7 +51,7 @@ def polynomial_function(x, *coefficients):
 
 
 # import FWHM
-params = [2.52336124e-04, -2.83882554e-03, 8.86278977e-01]
+params = [4.72336124e-04, -2.83882554e-03, 8.86278977e-01]
 grid_size = 59
 center = (grid_size - 1) / 2  # Center pixel in a 0-indexed grid
 
@@ -63,18 +63,27 @@ radial_distance = np.sqrt((x - center) ** 2 + (y - center) ** 2)
 
 # now i have radiatl distance, use the FWHM thing
 fwhm_grid = polynomial_function(radial_distance, *params)
-
+"""
+plt.clf()
+plt.imshow(fwhm_grid, cmap=cmap)
+plt.colorbar(label="pixels")
+output_name = "fwhm"
+txt_folder = "/home/rileyannereid/workspace/geant4/simulation-results/59-fwhm-3/"
+plt.savefig(f"{txt_folder}{output_name}_2D.png", dpi=300)
+plt.clf()
+"""
 # need to normalize to 1
 fwhm_grid = 2 - (fwhm_grid / np.min(fwhm_grid))
 
 # make it sum to 18
 gf_grid = 18 * fwhm_grid / np.sum(fwhm_grid)
-
+px_factor = 18 * (1 / 59**2)
 fwhm_step = 0
 det_size_cm = 4.956  # cm
 pixel_size = 0.28 * 0.3  # cm
 max_rad_dist = np.sqrt(2) * det_size_cm / 2
 bins = []
+"""
 while pixel_size * fwhm_step < max_rad_dist:
     fwhm_z = polynomial_function(fwhm_step, *params)
     radial_distance_1 = fwhm_step * pixel_size
@@ -90,10 +99,13 @@ while pixel_size * fwhm_step < max_rad_dist:
 bins.insert(0, 0)
 # bins = bins[::2]
 bins = bins[:-1]
+"""
 
 # clean averaged bin
-bins = np.linspace(0, 46, 30)
+bins = np.linspace(0, 46, 10)
 print(bins)
+save_me = []
+
 for i, n in enumerate(n_p):
     for j, theta in enumerate(thetas):
         fluxes = []
@@ -111,6 +123,8 @@ for i, n in enumerate(n_p):
         pixel_count = 59
         snr_average = 0
         snr_num = 0
+        psi_average = 0
+        psi_num = 0
         rho = 0.5
         I = np.sum(data) * 0.993
         nt = 59**2
@@ -136,6 +150,7 @@ for i, n in enumerate(n_p):
                 if angle < (theta + 0.5):
                     px_intensity = data[y, x]
                     psi = px_intensity / I
+                    #print(i,j, psi)
                     # if theta == 24:
                     #    print(psi)
                     snr = (
@@ -146,33 +161,37 @@ for i, n in enumerate(n_p):
                     )
                     snr_average += snr
                     snr_num += 1
+                    psi_average += psi
+                    psi_num +=1
                 # take a slice
                 # lets do std of pitch angle bins - maybe make another figure
                 for ii, bn in enumerate(bins[:-1]):
                     if angle >= bn and angle < bins[ii + 1]:
                         bins_ids[f"{ii}"].append(data[y, x])
-                        gf_ids[f"{ii}"].append(gf_grid[y, x])
+                        gf_ids[f"{ii}"].append(px_factor)
                     if ii == len(bins[:-1]):
                         if angle >= bn and angle <= bins[ii + 1]:
                             bins_ids[f"{ii}"].append(data[y, x])
-                            gf_ids[f"{ii}"].append(gf_grid[y, x])
+                            gf_ids[f"{ii}"].append(px_factor)
         # now get STD
         for ii, bn in enumerate(bins[:-1]):
-            fluxes.append(np.average(np.array(bins_ids[f"{ii}"])))
-            stds.append(np.std(np.array(bins_ids[f"{ii}"])))
+            fluxes.append(
+                np.average(np.array(bins_ids[f"{ii}"]) / np.array(gf_ids[f"{ii}"]))
+            )
+            stds.append(np.std(np.array(bins_ids[f"{ii}"]) / np.array(gf_ids[f"{ii}"])))
             if bins[ii + 1] < theta:
                 uniformed.append(1)
             else:
                 uniformed.append(0)
 
-        # print(i, theta, snr_average / snr_num, I)
-
+        #print(i, theta, snr_average / snr_num, I)
+        print(theta, psi_average/psi_num)
         normed_flux = np.array(fluxes) / max(fluxes)
         axs[j, i].plot(
             bins[:-1], uniformed, color="#D57965", linestyle="--", linewidth=2
         )
         axs[j, i].text(
-            45.5,
+            42.5,
             1.2,
             f"SNR: {round(snr_average / snr_num)}",
             ha="right",
@@ -195,9 +214,10 @@ for i, n in enumerate(n_p):
         axs[j, i].set_ylim([-0.25, 1.25])
         axs[j, i].tick_params(axis="y", labelsize=8)
         axs[j, i].tick_params(axis="x", labelsize=8)
+    save_me.append(stds)
 
 # for i in range(5):
-axs[2, 0].set_ylabel("Normalized Counts", rotation="vertical", fontsize=10)
+axs[2, 0].set_ylabel("Normalized Fluence", rotation="vertical", fontsize=10)
 axs[2, 0].yaxis.labelpad = 0.2
 
 # Add subtitles to the left of each row
@@ -233,3 +253,11 @@ plt.savefig(
     pad_inches=0.02,
     bbox_inches="tight",
 )
+
+plt.clf()
+xes = []
+for ii, bn in enumerate(bins[:-1]):
+    x = np.sum(np.array(gf_ids[f"{ii}"]))
+    xes.append(x)
+plt.plot(bins[:-1], xes)
+plt.savefig("test.png")

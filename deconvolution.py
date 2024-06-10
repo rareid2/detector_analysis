@@ -20,6 +20,9 @@ import sys
 
 sys.path.insert(1, "../coded_aperture_mask_designs")
 from util_fncs import makeMURA, make_mosaic_MURA, get_decoder_MURA, updated_get_decoder
+import cmocean
+
+cmap = cmocean.cm.thermal
 
 
 class Deconvolution:
@@ -203,6 +206,18 @@ class Deconvolution:
             self.dd = dd
         self.mask = mask
 
+        # save for MLEM
+        # mask_save = self.mask[11:34, 11:34]
+        mask_save = self.mask
+
+        mask_save = np.repeat(
+            np.repeat(mask_save, self.resample_n_pixels // self.mura_elements, axis=1),
+            self.resample_n_pixels // self.mura_elements,
+            axis=0,
+        )
+        # np.savetxt("../simulation-results/strahl/decoder.txt", mask_save)
+        np.savetxt("decoder.txt", mask_save)
+
         return mask
 
     def get_decoder(self, check, rotate, delta_decoding) -> NDArray[np.uint16]:
@@ -257,6 +272,8 @@ class Deconvolution:
             self.rawIm = np.flipud(self.rawIm)
             self.decoder = decoder * -1
 
+        # replace -1 with 0s
+        # self.decoder = np.where(self.decoder == -1, 0, self.decoder)
         return decoder
 
     def fft_conv(self) -> NDArray[np.uint16]:
@@ -516,7 +533,7 @@ class Deconvolution:
 
         if self.pinhole == False:
             # get mask and decoder
-            self.get_mask(self.simulation_engine.mosaic)
+            self.get_mask(True)
             self.get_decoder(check, rotate, delta_decoding)
 
             # flip the heatmap over both axes bc point hole
@@ -704,7 +721,7 @@ class Deconvolution:
         # plt.clf()
         plt.savefig(save_name, dpi=300)
 
-    def calculate_fwhm(self, direction, max_index, scale):
+    def calculate_fwhm(self, direction, max_index, scale, sect):
         def gaussian2d(xy, xo, yo, sigma_x, sigma_y, amplitude, offset):
             xo = float(xo)
             yo = float(yo)
@@ -728,8 +745,10 @@ class Deconvolution:
             y = np.linspace(0, img.shape[0], img.shape[0])
             x, y = np.meshgrid(x, y)
 
-            initial_guess = (img.shape[1] / 2, img.shape[0] / 2, 2, 2, 1, 0)
-            params, _ = opt.curve_fit(gaussian2d, (x, y), img.ravel(), p0=initial_guess)
+            initial_guess = (img.shape[1] / 2, img.shape[0] / 2, 3, 3, 1, 0)
+            params, _ = opt.curve_fit(
+                gaussian2d, (x, y), img.ravel(), p0=initial_guess, maxfev=5000
+            )
             xcenter, ycenter, sigmaX, sigmaY, amp, offset = params
 
             FWHM_x = 2 * sigmaX * np.sqrt(2 * np.log(2))
@@ -749,12 +768,10 @@ class Deconvolution:
             return fwhm, params
 
         # get the shifted image and scale
-        img = (
-            self.deconvolved_image / scale
+        img = self.deconvolved_image / np.amax(
+            self.deconvolved_image
         )  # this is the average signal over 0 after shifting for pt source centered
         import matplotlib.pyplot as plt
-
-        sect = 6
 
         # get the section where the signal is
         img_bound = img.shape[0] - 1
@@ -803,21 +820,14 @@ class Deconvolution:
                 max_index[0] - sect : max_index[0] + sect + 1,
                 max_index[1] - sect : max_index[1] + sect + 1,
             ]
-
-        if max_index[0] > 55 or max_index[1] > 55:
+        if max_index[0] > img_bound - sect or max_index[1] > img_bound - sect:
             img_clipped = img[
-                max_index[0] - 5 : max_index[0] + 5 + 1,
-                max_index[1] - 5 : max_index[1] + 5 + 1,
+                : 2 * max_index[0] + 1,
+                max_index[1] - (img_bound - max_index[1]) :,
             ]
-            print("special")
-        if max_index[0] > 56 or max_index[1] > 56:
-            img_clipped = img[
-                max_index[0] - 3 : max_index[0] + 4,
-                max_index[1] - 3 : max_index[1] + 4,
-            ]
-            print("special")
+            print("special", max_index)
 
-        # self.plot_3D_signal(img_clipped,save_name='3d.png')
+        # self.plot_3D_signal(img_clipped, save_name="3d.png")
         FWHM, params = getFWHM_GaussianFitScaledAmp(img_clipped, direction)
 
         # for plotting if interested

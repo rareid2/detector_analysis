@@ -5,12 +5,12 @@ from scipy.optimize import curve_fit
 from scipy.io import savemat
 
 # Load x and y values from separate text files
-txt_folder = "/home/rileyannereid/workspace/geant4/simulation-results/61-fwhm/"
+txt_folder = "/home/rileyannereid/workspace/geant4/simulation-results/13-fwhm/"
 
-maxpixel = 61 // 2
+maxpixel = 39 // 2
 px_int = 3
-num_points = 8
-maxgrid = 27
+num_points = 10
+maxgrid = 19
 
 hits = False
 remove_edges = False
@@ -78,18 +78,20 @@ if remove_edges:
 # reverse_zx = np.flip(zx)
 # reverse_zy = np.flip(zy)
 reverse_zz = np.flip(zz)
-
+stacked_zz = np.hstack((reverse_zz, zz[1:]))
 # Stack the input and reverse arrays together
 # stacked_zx = np.hstack((reverse_zx, zx[1:]))
 # stacked_zy = np.hstack((reverse_zy, zy[1:]))
-stacked_zz = np.hstack((reverse_zz, zz[1:]))
+
 
 # we only need stacked zz now
 main_diagonal = np.array(
     [(i - maxpixel, i - maxpixel) for i in range(0, maxgrid + px_int, px_int)]
 )
+
+
+main_diagonal = [[i, i] for i in range(0, (39 // 2), 3)]
 main_diagonal = main_diagonal[:-1]
-main_diagonal = [[i, i] for i in range(0, (61 // 2), 3)]
 main_diagonal = np.vstack((-1 * np.flip(main_diagonal[1:]), main_diagonal))
 print(main_diagonal)
 diagonal_radial = np.array([np.sqrt(md[0] ** 2 + md[1] ** 2) for md in main_diagonal])

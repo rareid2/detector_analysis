@@ -137,6 +137,9 @@ def write_pt_macro(
             f.write("/gps/ang/maxphi 360 deg \n")
             f.write("/gps/energy " + str(ene) + " keV \n")
 
+            f.write("/analysis/setFileName ../simulation-data/mock-hist \n")
+            f.write("/analysis/h1/set 1 100 1 10 keV none log \n")
+
             f.write("/run/printProgress %d \n" % int(progress_mod))
             f.write("/run/beamOn " + str(int(n_particles)) + "\n")
 
@@ -210,10 +213,13 @@ def write_surface_macro(
     progress_mod: int = 1000,
     fname_tag: str = "test",
     theta: float = None,
+    theta_lower: float = None,
     ca_pos: float = 498.91,
     confine: bool = False,
     world_offset: float = 499.95,
     ring: bool = False,
+    plane_size_cm: float = None,
+    sphere_center: float = None,
 ) -> None:
     """
     create macro file for a point source (or multiple point sources)
@@ -248,16 +254,24 @@ def write_surface_macro(
 
             # n_particles = n_particles * np.sqrt(fov_frac)
             # f.write(f"/gps/pos/radius {circle_radius} cm \n")
-            f.write(
-                "/gps/pos/halfx 5.054 cm \n"
-            )  # 4.875  # 3.72066 # 1.095 # 3.255 # 2.445 5.03 -- use for aperture
-            f.write("/gps/pos/halfy 5.054 cm \n")  # 4.875  # 3.72066
-            f.write(f"/gps/pos/centre 0 0 496.28 cm \n")  # was -5
+            if plane_size_cm:
+                f.write(
+                    f"/gps/pos/halfx {plane_size_cm} cm \n"
+                )  # experiemtn 1.331 -- use for aperture
+                f.write(
+                    f"/gps/pos/halfy {plane_size_cm} cm \n"
+                )  # 4.875  # 3.72066 # WAS 5.441
+            else:
+                f.write(
+                    "/gps/pos/halfx 5.265 cm \n"
+                )  # experiemtn 1.331 -- use for aperture
+                f.write("/gps/pos/halfy 5.265 cm \n")  # 4.875  # 3.72066 # WAS 5.441
+            f.write(f"/gps/pos/centre 0 0 {sphere_center} cm \n")  # was 498.527
         else:
             f.write("/gps/pos/type Surface \n")
             f.write("/gps/pos/shape Sphere \n")
             f.write(f"/gps/pos/radius {radius_cm} cm \n")
-            f.write(f"/gps/pos/centre 0 0 496.28 cm \n")
+            f.write(f"/gps/pos/centre 0 0 {sphere_center} cm \n")
 
         # center chosen to align with pinhole (maybe change this?)
         # 499.935 is the front face of detector 1
@@ -271,10 +285,10 @@ def write_surface_macro(
 
         # if using user defined distribution
         if theta is not None:
-            f.write("/gps/ang/type iso \n")  # iso
+            f.write("/gps/ang/type iso \n")  # cos
             f.write("/gps/ang/rot1 -1 0 0 \n")
             f.write("/gps/ang/rot2 0 1 0 \n")
-            f.write(f"/gps/ang/mintheta 0 deg \n")
+            f.write(f"/gps/ang/mintheta {theta_lower} deg \n")  # theta lower
             f.write(f"/gps/ang/maxtheta {theta} deg \n")  # 90
 
             # f.write("/gps/ang/type user \n")
@@ -320,9 +334,20 @@ def write_surface_macro(
         f.write("/gps/ene/type %s \n" % ene_type)
         if ene_type == "Mono":
             f.write("/gps/ene/mono %.4f keV \n" % ene_min_keV)
+            f.write("/analysis/setFileName ../simulation-data/mock-hist \n")
+            f.write("/analysis/h1/set 1 100 1 10 keV none log \n")
+
         else:
             f.write("/gps/ene/min %.2f keV \n" % ene_min_keV)
             f.write("/gps/ene/max %.2f keV \n" % ene_max_keV)
+            f.write("/gps/ene/alpha -1 \n")
+            f.write(
+                "/analysis/setFileName ../simulation-data/energy-spectrum/src_spectrum \n"
+            )
+            f.write(
+                "/analysis/h1/set 1 100 %.2f %.2f keV none log \n"
+                % (ene_min_keV, ene_max_keV)
+            )
 
         # get a progress bar
         f.write("/run/printProgress %d \n" % int(progress_mod))

@@ -934,7 +934,7 @@ def plot(histos, fname):
         ctr += 1
         if histo["type"] == "HISTO":
             if histo["dim"] == 1:
-                plot_single_1d(histo, ax)
+                plot_single_1d(histo, ax, fname)
             elif histo["dim"] == 2:
                 plot_single_2d(histo, ax, fname)
             else:
@@ -969,7 +969,7 @@ def plot_single_xy(histo, ax=None):
         plt.title(histo["title"])
 
 
-def plot_single_1d(histo, ax=None):
+def plot_single_1d(histo, ax=None, fname=None):
     import matplotlib.pyplot as plt
 
     # xb,xl,xh=float(histo['nb'][0]),float(histo['low'][0]),float(histo['high'][0])
@@ -995,7 +995,9 @@ def plot_single_1d(histo, ax=None):
         plt.ylabel(histo["yaxistit"])
     if "title" in histo:
         plt.title(histo["title"])
-
+    plt.subplots_adjust(wspace=0.4, hspace=0.8)
+    print("finished plotting")
+    plt.savefig(fname)
 
 def plot_single_2d(histo, ax=None, fname="test"):
     import matplotlib.pyplot as plt

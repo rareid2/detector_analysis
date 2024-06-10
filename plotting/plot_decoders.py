@@ -18,6 +18,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from plotting.plot_settings import *
 from matplotlib import ticker
+
 # construct = CA and TD
 # source = DS and PS
 
@@ -42,7 +43,7 @@ i = 0
 energies = np.logspace(2, 6.7, 15) / 1000  # keV
 energy = 100
 # ------------------- simulation parameters ------------------
-#for energy in energies:
+# for energy in energies:
 det_size_cm = det_size_cms[i]
 pixel = pixels[i]
 n_elements_original = n_elements_originals[i]
@@ -131,12 +132,12 @@ deconvolver.deconvolve(
     rotate=False,
     delta_decoding=False,
     apply_noise=False,
-    resample_array=True
+    resample_array=True,
 )
 deconvolver2 = Deconvolution(myhits, simulation_engine)
 
 deconvolver2.deconvolve(
-    downsample=int(n_elements_original*multiplier),
+    downsample=int(n_elements_original * multiplier),
     trim=trim,
     vmax=None,
     plot_deconvolved_heatmap=False,
@@ -163,34 +164,40 @@ print(
 
 fig, axs = plt.subplots(1, 3, figsize=(5.7, 3))
 
-copper = mpl.colormaps['Greys_r'].resampled(3)
-hex_list = ["#000000","#808080","#ffffff",]
+copper = mpl.colormaps["Greys_r"].resampled(3)
+hex_list = [
+    "#000000",
+    "#808080",
+    "#ffffff",
+]
 copper = get_continuous_cmap(hex_list)
 copper = copper.resampled(3)
 
-im1 = axs[0].imshow(deconvolver.mask, cmap=copper,vmin=-1)
-axs[0].set_title('Moasic Aperture\n59-Rank',fontsize=10,pad=0.05)
-axs[0].axis('off')
-rect = patches.Rectangle((28,28), 59, 59, linewidth=2, edgecolor='#87518D', facecolor='none')
+im1 = axs[0].imshow(deconvolver.mask, cmap=copper, vmin=-1)
+axs[0].set_title("Mosaic Aperture\n59-Rank", fontsize=10, pad=0.05)
+axs[0].axis("off")
+rect = patches.Rectangle(
+    (28, 28), 59, 59, linewidth=2, edgecolor="#87518D", facecolor="none"
+)
 
 # Add the rectangle to the plot
 axs[0].add_patch(rect)
 
 im2 = axs[1].imshow(deconvolver.decoder, cmap=copper)
-axs[1].set_title('Balanced\nDecoding',fontsize=10,pad=0.05)
-axs[1].axis('off')
+axs[1].set_title("Balanced\nDecoding", fontsize=10, pad=0.05)
+axs[1].axis("off")
 
 im3 = axs[2].imshow(deconvolver2.decoder, cmap=copper)
-axs[2].set_xlim([0,59*3])
-axs[2].set_title('Delta\nDecoding',fontsize=10, pad=0.05)
-axs[2].axis('off')
+axs[2].set_xlim([0, 59 * 3])
+axs[2].set_title("Delta\nDecoding", fontsize=10, pad=0.05)
+axs[2].axis("off")
 
 plt.tight_layout()
 
 # Add a colorbar below the three panels
-cbar = fig.colorbar(im3, ax=axs, orientation='horizontal', pad=0.01, aspect=80)
-cbar.set_ticks([-1,0,1])
+cbar = fig.colorbar(im3, ax=axs, orientation="horizontal", pad=0.01, aspect=80)
+cbar.set_ticks([-1, 0, 1])
 cbar.ax.tick_params(labelsize=10)
 # Display the plot
 
-plt.savefig('4p1_decoders.png',dpi=500,pad_inches=0.02,bbox_inches='tight')
+plt.savefig("4p1_decoders.png", dpi=500, pad_inches=0.02, bbox_inches="tight")

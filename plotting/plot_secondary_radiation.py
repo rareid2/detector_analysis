@@ -64,14 +64,19 @@ def color_function(energy, thickness):
     return brehm[thick_index], sec_e[thick_index], primary_only, snr_reduction
 
 
+es_array = []
 snr_array = []
 for energy in energies:
     snrs = []
+    es = []
     for thickness in thicknesses:
         brehm, sec_e, primary_only, snr_reduction = color_function(energy, thickness)
         snrs.append(1000 * brehm / primary_only)
+        es.append(1000 * sec_e / primary_only)
+
         # snrs.append(snr_reduction)
     snr_array.append(np.array(snrs))
+    es_array.append(np.array(es))
 
 fig = plt.figure(figsize=(5.7, 2.5))
 
@@ -82,7 +87,7 @@ sec_e = []
 ax1 = plt.subplot2grid((2, 4), (0, 0), rowspan=2, colspan=2)
 
 Z = np.hstack(snr_array)
-
+Ze = np.hstack(es_array)
 # Create a contour plot
 contour = ax1.contourf(X / 1000, Y / 1000, Z, cmap=cmap)
 cbar = plt.colorbar(contour, pad=0.02)
@@ -123,19 +128,20 @@ for thickness in thicknesses:
 line_color = "#39329E"
 
 # Bottom-left subplot
+"""
 ax3 = plt.subplot2grid((2, 4), (1, 2), colspan=2)
 ax3.plot(thicknesses / 1000, electrons, color=line_color, linewidth=2)
 ax3.yaxis.tick_right()
-ax3.set_xlabel("Tungsten Thickness [mm]", fontsize=8)
+
 ax3.set_ylabel("Seconday e- \n per 1000 e-", fontsize=8)
 ax3.yaxis.set_label_position("right")
 ax3.tick_params(axis="x", which="both", labelsize=8)
 ax3.tick_params(axis="y", which="both", labelsize=8)
 ax3.yaxis.labelpad = 11
 ax3.xaxis.labelpad = 0.2
-
+"""
 # Top-right subplot
-ax2 = plt.subplot2grid((2, 4), (0, 2), colspan=2, sharex=ax3)
+ax2 = plt.subplot2grid((2, 4), (0, 2), colspan=2, rowspan=2)
 ax2.plot(thicknesses / 1000, snrs, color=line_color, linewidth=2)
 ax2.yaxis.tick_right()
 
@@ -147,18 +153,93 @@ ax2.tick_params(axis="x", which="both", labelsize=8)
 ax2.tick_params(axis="y", which="both", labelsize=8)
 ax2.yaxis.labelpad = 0.2
 ax2.xaxis.labelpad = 0.2
-ax3.grid(True, color="lightgrey", linestyle="--", linewidth=0.5)
+# ax3.grid(True, color="lightgrey", linestyle="--", linewidth=0.5)
 
 ax1.text(0.5, 3.9, "a)", fontsize=8, ha="left", va="top", color="white")
-ax2.text(0.03, 415, "b)", fontsize=8, ha="left", va="top", color="black")
-ax3.text(0.03, 6.7, "c)", fontsize=8, ha="left", va="top", color="black")
-
+ax2.text(0.03, 425, "b)", fontsize=8, ha="left", va="top", color="black")
+# ax3.text(0.03, 6.7, "c)", fontsize=8, ha="left", va="top", color="black")
+ax2.set_xlabel("Tungsten Thickness [mm]", fontsize=8)
 # plt.setp(ax2.get_xticklabels(), visible=False)
-ax2.tick_params(labelbottom=False)
 plt.tight_layout()
 
 plt.savefig(
-    "../simulation-results/final-images/11_secondaries.png",
+    "../simulation-results/final-images/11_brem.png",
+    dpi=500,
+    bbox_inches="tight",
+    pad_inches=0.01,
+)
+plt.clf()
+
+
+# ------------------------------ AGAIN-----------------------------
+
+# Large subplot spanning 2 rows and 2 columns
+ax1 = plt.subplot2grid((2, 4), (0, 0), rowspan=2, colspan=2)
+
+# Create a contour plot
+contour = ax1.contourf(X / 1000, Y / 1000, Ze, cmap=cmap)
+cbar = plt.colorbar(contour, pad=0.02)
+cbar.set_label("Secondary e- per 1000 e-", fontsize=8)
+
+cbar.ax.yaxis.labelpad = 1.2
+cbar.ax.tick_params(axis="y", labelsize=8)
+
+ax1.set_xlabel("Electron Energy [MeV]", fontsize=8)
+ax1.set_ylabel(r"Tungsten Thickness [mm]", fontsize=8)
+rect = plt.Rectangle(
+    (energies[18] / 1000, 0.12),
+    0.2,
+    3.85,
+    fill=False,
+    edgecolor="lightgrey",
+    linestyle="--",
+    linewidth=0.5,
+)
+ax1.axvline(
+    energies[18] / 1000, 0, 3.87, color="lightgrey", linestyle="--", linewidth=0.5
+)
+ax1.tick_params(axis="y", which="both", labelsize=8)
+ax1.tick_params(axis="x", which="both", labelsize=8)
+ax1.yaxis.labelpad = 0.2
+ax1.xaxis.labelpad = 0.2
+# plt.xscale('log')
+
+energy = energies[18]
+print(energy)
+snrs = []
+electrons = []
+for thickness in thicknesses:
+    brehm, sec_e, primary_only, _ = color_function(energy, thickness)
+    snrs.append(1000 * brehm / primary_only)
+    electrons.append(1000 * sec_e / primary_only)
+
+line_color = "#39329E"
+
+# Top-right subplot
+ax2 = plt.subplot2grid((2, 4), (0, 2), colspan=2, rowspan=2)
+ax2.plot(thicknesses / 1000, electrons, color=line_color, linewidth=2)
+ax2.yaxis.tick_right()
+
+ax2.grid(True, color="lightgrey", linestyle="--", linewidth=0.5)
+
+ax2.set_ylabel("Secondary e- \n per 1000 e-", fontsize=8)
+ax2.yaxis.set_label_position("right")
+ax2.tick_params(axis="x", which="both", labelsize=8)
+ax2.tick_params(axis="y", which="both", labelsize=8)
+ax2.yaxis.labelpad = 0.2
+ax2.xaxis.labelpad = 0.2
+# ax3.grid(True, color="lightgrey", linestyle="--", linewidth=0.5)
+
+ax1.text(0.5, 3.9, "a)", fontsize=8, ha="left", va="top", color="white")
+ax2.text(0.03, 6.8, "b)", fontsize=8, ha="left", va="top", color="black")
+# ax3.text(0.03, 6.7, "c)", fontsize=8, ha="left", va="top", color="black")
+
+# plt.setp(ax2.get_xticklabels(), visible=False)
+ax2.set_xlabel("Tungsten Thickness [mm]", fontsize=8)
+plt.tight_layout()
+
+plt.savefig(
+    "../simulation-results/final-images/11_sec_e.png",
     dpi=500,
     bbox_inches="tight",
     pad_inches=0.01,

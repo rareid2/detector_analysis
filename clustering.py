@@ -21,7 +21,7 @@ def find_clusters(hits: Hits) -> Tuple[list, list]:
         clusters : list of containing ... ? not totally sure
     """
 
-    # find locations of where the data is greater than 0 - returns x and y array 
+    # find locations of where the data is greater than 0 - returns x and y array
     wpoint = np.where(hits.detector_hits > 0)
     # creates a set of x,y coords (unique points only) from the locations of every pixel with more than 0 deposited
     points = set((x, y) for x, y in zip(*wpoint))
@@ -136,7 +136,7 @@ def remove_clusters(
     # convert to arrays
     track_areas = np.array(track_areas)
     track_total_energy = np.array(track_total_energy)
-    track_all_energies = np.array(track_all_energies, dtype='object')
+    track_all_energies = np.array(track_all_energies, dtype="object")
 
     # remove clusters based on three criteria: cluster shape, cluster height (max in one pixel), stopping power
 
@@ -148,43 +148,49 @@ def remove_clusters(
     # replace with 0
     track_shapes[dots] = 0
 
-    # linearity of the track 
+    # linearity of the track
     # https://www.tutorialspoint.com/program-to-count-number-of-points-that-lie-on-a-line-in-python
     def linearity(point_crs):
-      res = 0
-      for i in range(len(point_crs)):
-         x1, y1 = point_crs[i][0], point_crs[i][1]
-         slopes = {}
-         same = 1
-         for j in range(i + 1, len(point_crs)):
-            x2, y2 = point_crs[j][0], point_crs[j][1]
-            if x2 == x1:
-               slopes[float("inf")] = slopes.get(float("inf"), 0) + 1
-            elif x1 == x2 and y1 == y2:
-               same += 1
-            else:
-               slope = (y2 - y1) / (x2 - x1)
-               slopes[slope] = slopes.get(slope, 0) + 1
-         if slopes:
-            res = max(res, same + max(slopes.values()))
-      return res / len(point_crs)
+        res = 0
+        for i in range(len(point_crs)):
+            x1, y1 = point_crs[i][0], point_crs[i][1]
+            slopes = {}
+            same = 1
+            for j in range(i + 1, len(point_crs)):
+                x2, y2 = point_crs[j][0], point_crs[j][1]
+                if x2 == x1:
+                    slopes[float("inf")] = slopes.get(float("inf"), 0) + 1
+                elif x1 == x2 and y1 == y2:
+                    same += 1
+                else:
+                    slope = (y2 - y1) / (x2 - x1)
+                    slopes[slope] = slopes.get(slope, 0) + 1
+            if slopes:
+                res = max(res, same + max(slopes.values()))
+        return res / len(point_crs)
 
     linearities = np.array([linearity(region[cluster[0]]) for cluster in clusters])
 
     # SMALL BLOB has between 2 and 4 pixels and linearity is not 1
-    small_blobs = np.where((track_shapes > 1) & (track_shapes < 5) & (linearities < 1.0))
+    small_blobs = np.where(
+        (track_shapes > 1) & (track_shapes < 5) & (linearities < 1.0)
+    )
     track_shapes[small_blobs] = 0
 
     # STRAIGHT TRACK (short) has linearity of 1 and between 2 and 4 pixels
-    straight_short_tracks =  np.where((track_shapes > 1) & (track_shapes < 5) & (linearities == 1.0))
+    straight_short_tracks = np.where(
+        (track_shapes > 1) & (track_shapes < 5) & (linearities == 1.0)
+    )
     track_shapes[straight_short_tracks] = 0
-    
+
     # HEAVY BLOBS have more than 4 pixels and inside pixels (pixels with 4 touching nearest neighbors)
     heavy_blobs = []
-    for idx, track in enumerate(track_shapes): 
+    for idx, track in enumerate(track_shapes):
         if track != 0:
             # use nearest neighbors to distance of each pixel to every otheer pixel
-            nbrs = NearestNeighbors(n_neighbors=5, algorithm='auto').fit(region[clusters[idx][0]])
+            nbrs = NearestNeighbors(n_neighbors=5, algorithm="auto").fit(
+                region[clusters[idx][0]]
+            )
             distances, indices = nbrs.kneighbors(region[clusters[idx][0]])
             for distance in distances:
                 # find if there is a pixel in the group that is 1 pixel away from 4 other pixels (inside pixel)
@@ -192,7 +198,7 @@ def remove_clusters(
                     heavy_blobs.append(idx)
                     # if so, save the index of the group and get out
                     break
-    
+
     track_shapes[heavy_blobs] = 0
 
     # STRAIGHT TRACK (long) has linearity above 90% and more than 4 pixels and is not a heavy blob
@@ -206,16 +212,19 @@ def remove_clusters(
     # anything left over is bad and confusing
     leftover_tracks = np.where(track_shapes > 0)
     if len(leftover_tracks[0] > 0):
-        print("ERROR %d LEFTOVER TRACKS CHECK SHAPE CLASSIFICATION ALGORITHM" % len(leftover_tracks[0]))
+        print(
+            "ERROR %d LEFTOVER TRACKS CHECK SHAPE CLASSIFICATION ALGORITHM"
+            % len(leftover_tracks[0])
+        )
 
     # now check HEIGHT (max eneergy in group) and STOPPING POWER
-    potential_signal_pixels = [] # these are both x rays / gammas / electrons
+    potential_signal_pixels = []  # these are both x rays / gammas / electrons
     noisy_pixels = []
     only_electrons = []
     protons = []
     ions = []
 
-    rho_silicon = 2.336 # g/cm^3
+    rho_silicon = 2.336  # g/cm^3
 
     # cluster classifcation based on Gohl et al., 2019 -  SATRAM paper using Timepix 300um Si sensor
     for idx, te in enumerate(track_all_energies):
@@ -223,7 +232,7 @@ def remove_clusters(
         if idx in dots[0]:
             if float(te) > 300:
                 noisy_pixels.append(idx)
-            else: # not over 300 keV, either x ray or electron
+            else:  # not over 300 keV, either x ray or electron
                 potential_signal_pixels.append(idx)
         # small blobs and straight short tracks are either protons or xrays/electrons depending on energy deposited
         elif idx in small_blobs[0] or idx in straight_short_tracks[0]:
@@ -232,7 +241,7 @@ def remove_clusters(
             else:
                 potential_signal_pixels.append(idx)
         # heavy blobs ions or protons based on stopping power
-        elif idx in heavy_blobs: # heavy blobs is formatted as a list
+        elif idx in heavy_blobs:  # heavy blobs is formatted as a list
             stopping_power = track_total_energy[idx] / (rho_silicon * track_areas[idx])
             if stopping_power > 100 * 1e3:
                 ions.append(idx)
@@ -249,13 +258,15 @@ def remove_clusters(
         elif idx in curly_tracks[0]:
             only_electrons.append(idx)
         else:
-            print('something went wrong')
+            print("something went wrong")
 
     # final signal filtering - check energy deposited
     signal_pixels = []
+    print("PRE BACKGROUND", len(potential_signal_pixels))
     for idx in potential_signal_pixels:
         if min_energy_keV <= track_total_energy[idx] <= max_energy_keV:
             signal_pixels.append(idx)
+    print("POST BACKGROUND", len(signal_pixels))
 
     # plotting! check if classification works:
     """
@@ -390,8 +401,12 @@ def remove_clusters(
 
     background_tracks_total_energy = track_total_energy.copy()
     signal_tracks_total_energy = track_total_energy[signal_pixels]
-
-    return cleaned_data, background_clusters, background_tracks_total_energy, signal_tracks_total_energy
+    return (
+        cleaned_data,
+        background_clusters,
+        background_tracks_total_energy,
+        signal_tracks_total_energy,
+    )
 
 
 # for testing

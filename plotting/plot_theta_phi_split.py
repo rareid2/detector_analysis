@@ -185,7 +185,9 @@ plt.clf()
 pitch_angle_bins = bins
 
 fig, ax = plt.subplots(
-    1, 2, figsize=(5.7, 1.75), gridspec_kw={"hspace": 0, "wspace": 0}
+    1,
+    1,
+    figsize=(3, 3),
 )
 polar_grid_image = plt.imread("polar_grid.png")
 
@@ -193,10 +195,10 @@ import cmocean
 
 cmap = cmocean.cm.thermal
 
-im = ax[0].imshow(data, cmap, origin="lower")
+im = ax.imshow(data, cmap, origin="lower")
 
-cbar = fig.colorbar(im, ax=ax[0], orientation="horizontal", pad=0.01, shrink=0.6)
-ax[0].axis("off")
+cbar = fig.colorbar(im, ax=ax, orientation="horizontal", pad=0.01, shrink=0.8)
+ax.axis("off")
 
 
 cbar.set_label(r"$\times 10^3 cm^{-2}sr^{-1}$", fontsize=8)
@@ -206,13 +208,34 @@ cbar.ax.tick_params(axis="x", labelsize=8)
 cbar.ax.xaxis.labelpad = 0.2
 
 new_position = [-0.09, 0.11, 0.77, 0.77]  # [left, bottom, width, height]
-ax[0].set_position(new_position)
+ax.set_position(new_position)
 
-new_position = [0.178, 0.053, 0.234, 0.05]  # [left, bottom, width, height]
+new_position = [-0.09, 0.053, 0.77, 0.04]  # [left, bottom, width, height]
 cbar.ax.set_position(new_position)
 
 overlay_position = (0.5, 0.5)  # Example: (0.5, 0.5) is the center
 
+circle = plt.Circle((133, 133), 6, fill=None, edgecolor="white", linewidth=0.3)
+ax.add_patch(circle)
+circle = plt.Circle(
+    (133, 133), 1, fill=True, edgecolor="white", linewidth=0.3, facecolor="white"
+)
+ax.add_patch(circle)
+
+ax.text(117, 145, r"$\vec{B}$", fontsize=6, ha="left", va="top", color="white")
+
+plt.savefig(
+    "../simulation-results/final-images/rings-sim.png",
+    dpi=500,
+    bbox_inches="tight",
+    pad_inches=0.02,
+)
+
+fig, ax = plt.subplots(
+    1,
+    1,
+    figsize=(7, 2),
+)
 # ax[0].imshow(polar_grid_image, extent=(overlay_position[0], overlay_position[0]+0.2, overlay_position[1], overlay_position[1]+0.2),alpha=0.2)
 
 norm = plt.Normalize(0, 41399)
@@ -253,7 +276,7 @@ for pn in range(len(pitch_angle_bins) - 1):
                 edgecolor="black",
                 lw=0.2,
             )
-        ax[1].add_patch(rectangle)
+        ax.add_patch(rectangle)
 
 
 def fmt(x, pos):
@@ -278,11 +301,11 @@ plt.ylim([0, 38.36])
 plt.xlabel(r"Gyrophase $\phi^\circ$", fontsize=8)
 plt.ylabel(r"Pitch Angle $\theta^\circ$", fontsize=8)
 
-ax[1].tick_params(axis="x", labelsize=8)
-ax[1].tick_params(axis="y", labelsize=8)
+ax.tick_params(axis="x", labelsize=8)
+ax.tick_params(axis="y", labelsize=8)
 
 
-cbar = plt.colorbar(cm.ScalarMappable(norm=norm, cmap=cmap), ax=ax[1], pad=0.01)
+cbar = plt.colorbar(cm.ScalarMappable(norm=norm, cmap=cmap), ax=ax, pad=0.01)
 cbar.ax.yaxis.set_major_formatter(ticker.FuncFormatter(fmt))
 cbar.ax.tick_params(axis="y", labelsize=8)
 # ax[1].text(1.2, -0.05, rf'$\times 10^{int(4)}$', ha='right', va='top', transform=ax[1].transAxes, fontsize=8)
@@ -291,12 +314,12 @@ cbar.set_label(r"$\times 10^4cm^{-2}sr^{-1}$", fontsize=8)
 
 cbar.ax.yaxis.labelpad = 1.2
 cbar.ax.tick_params(axis="y", labelsize=8)
-ax[1].xaxis.labelpad = 0.2
-ax[1].yaxis.labelpad = 0.2
+ax.xaxis.labelpad = 0.2
+ax.yaxis.labelpad = 0.2
 
 
 new_position = [0.49, 0.065, 0.37, 0.81]  # [left, bottom, width, height]
-ax[1].set_position(new_position)
+ax.set_position(new_position)
 
 original_position = cbar.ax.get_position()
 print(original_position)
@@ -304,74 +327,10 @@ print(original_position)
 new_position = [0.865, 0.065, 0.92, 0.81]  # [left, bottom, width, height]
 cbar.ax.set_position(new_position)
 
-circle = plt.Circle((133, 133), 6, fill=None, edgecolor="white", linewidth=0.3)
-ax[0].add_patch(circle)
-circle = plt.Circle(
-    (133, 133), 1, fill=True, edgecolor="white", linewidth=0.3, facecolor="white"
-)
-ax[0].add_patch(circle)
-
-ax[0].text(115, 145, r"$\vec{B}$", fontsize=6, ha="left", va="top", color="white")
-ax[0].text(5, 255, "a)", fontsize=8, ha="left", va="top", color="white")
-ax[1].text(5, 37, "b)", fontsize=8, ha="left", va="top", color="black")
 
 plt.savefig(
-    "../simulation-results/rings/5_rings.png",
+    "../simulation-results/final-images/rings-projected.png",
     dpi=500,
     bbox_inches="tight",
     pad_inches=0.02,
 )
-"""
-# first make sure i got the right ones
-#colors = ['red', 'green', 'blue', 'yellow', 'purple', 'orange', 'pink', 'brown', 'cyan']
-#for n in range(9):
-
-for (y,x) in bins_ids["31"]:
-    #if n == 4 or n ==3:
-    rect = patches.Rectangle(
-        (x - 0.5, y - 0.5),
-        1,
-        1,
-        linewidth=2,
-        edgecolor="black",
-        facecolor="none",
-    )
-    plt.gca().add_patch(rect)
-
-plt.imshow(data, cmap=cmap)
-plt.colorbar()
-plt.show()
-
-# FINALLY
-# we have all the pixels assigned to all the places - to check
-summm = 0
-sum_pa = 0
-for bi,radial_distance in enumerate(radial_distances):
-    sum_pa+=len(bins_ids[f"{bi}"])
-    for keykey in gryophase_bins[f"{bi}-indices"].keys():
-        summm += len( gryophase_bins[f"{bi}-indices"][keykey])
-print(summm)
-print(sum_pa)
-
-
-# Loop through each index of the 2D array
-check = 0
-total_elements = 0
-for i in range(len(data)):
-    for j in range(len(data)):
-        total_elements+=1
-        # Check if the element at the current index is in any of the lists
-        element_to_check = (i,j)
-        
-        for key, value in bins_ids.items():
-            if element_to_check in value:
-                if check == 1:
-                    print("DOUBLE COUNT", i, j)
-                check = 1
-        if check == 0:
-            print("error at ", i,j)
-        check = 0
-print(total_elements)
-"""
-
-# plot rectangles - the width is the gyrobin and the hieght is the pitch angle bin

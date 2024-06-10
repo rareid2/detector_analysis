@@ -38,6 +38,7 @@ def write_ca_config(
     mask_size_mm: float,
     aperture_filename: str,
     radius_cm: float,
+    vol_name: str,
 ) -> None:
     """
     write a config file that sets up coded aperture geometry
@@ -66,8 +67,12 @@ def write_ca_config(
     f.write(f"{radius_cm}\n")
 
     # aperture filename
-    aperture_path = "./src/mask_designs/" + aperture_filename
+    aperture_path = "./src/mask_designs/" + aperture_filename + "\n"
     f.write(aperture_path)
+    if vol_name:
+        f.write(f"{vol_name}\n")
+    else:
+        f.write(f"none\n")
 
     f.close()
     print("Wrote ca config file to src folder")

@@ -1,12 +1,16 @@
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
+from matplotlib.colors import ListedColormap
 import matplotlib.ticker as mtick
 from numpy.typing import NDArray
-
-from plotting.plot_settings import *
+import numpy as np
+import matplotlib.patches as patches
 
 """plot data collected in experiment with minipix edu
 """
+
+
+import cmocean
 
 
 def plot_four_subplots(
@@ -18,6 +22,8 @@ def plot_four_subplots(
     vmaxes: list = [100, 1e5],
     save_name: str = "plot_subplots",
 ):
+
+    cmap = cmocean.cm.thermal
     fig, ax = plt.subplots(2, 2, figsize=(10, 6))
     image = ax[0, 0].imshow(raw_data, cmap=cmap, vmin=vmins[0], vmax=vmaxes[0])
     image = ax[0, 1].imshow(cleaned_data, cmap=cmap, vmin=vmins[0], vmax=vmaxes[0])
@@ -91,20 +97,31 @@ def plot_background_subplots(
     fig.set_figheight(6)
     fig.set_figwidth(10)
 
+    cmap = cmocean.cm.thermal
+    hex_list = ["#39329E"]
+
+    # Create a colormap with only two colors
+    colors = ["#082E56", "white"]
+
+    # Create the colormap
+    cmap = ListedColormap(colors)
+
     ax1 = plt.subplot2grid(shape=(2, 3), loc=(0, 0), colspan=1)
     ax2 = plt.subplot2grid(shape=(2, 3), loc=(1, 0), colspan=1, sharex=ax1, sharey=ax1)
     ax3 = plt.subplot2grid(shape=(2, 3), loc=(0, 1), colspan=2)
     ax4 = plt.subplot2grid(shape=(2, 3), loc=(1, 1), colspan=2, sharex=ax3, sharey=ax3)
 
-    image = ax1.imshow(raw_data, cmap=cmap, vmin=vmins[0], vmax=vmaxes[0])
-    image = ax2.imshow(cleaned_data, cmap=cmap, vmin=vmins[0], vmax=vmaxes[0])
+    image = ax1.imshow(raw_data, cmap=cmap, vmin=0, vmax=1)
+    image = ax2.imshow(cleaned_data, cmap=cmap, vmin=0, vmax=1)
 
-    ax3.loglog(bincenters, background_hist / time, "-", c=hex_list[0])
-    ax4.plot(bincenters, signal_hist / time, "-", c=hex_list[0])
+    ax3.loglog(bincenters, background_hist / time, "-", c=hex_list[0], linewidth=2)
+    ax4.loglog(bincenters, signal_hist / time, "-", c=hex_list[0], linewidth=2)
+
+    print(bincenters[10:15], background_hist[10:15], signal_hist[10:15])
     ax3.set_xlim([6, 300])
     ax4.set_xlim([6, 300])
 
-    print(sum(signal_hist / time))
+    # print(sum(signal_hist / time))
 
     max_counts = 0.01
 
@@ -138,9 +155,22 @@ def plot_background_subplots(
     fig.tight_layout()
 
     plt.savefig(
-        "../experiment_results/%s.png" % save_name, dpi=500, bbox_inches="tight"
+        "../experiment_results/%s.png" % "background", dpi=500, bbox_inches="tight"
     )
     plt.clf()
+    # raw_data = raw_data[23:60, 130:167]
+    cmap = cmocean.cm.thermal
+    plt.imshow(raw_data, cmap=cmap, vmax=100)
+    print(raw_data)
+    cbar = plt.colorbar(
+        pad=0.05, label="keV/pixel", orientation="horizontal", shrink=0.46, extend="max"
+    )
+    cbar.ax.tick_params(axis="x", labelsize=10)
+    plt.savefig(
+        "../experiment_results/%s.png" % "background-single",
+        dpi=500,
+        bbox_inches="tight",
+    )
 
 
 def plot_alignment(
@@ -150,6 +180,8 @@ def plot_alignment(
     vmaxes: list = [100, 1e5],
     save_name: str = "plot_alignment",
 ):
+
+    cmap = cmocean.cm.thermal
     hex_list = ["#023047", "#219EBC", "#FFB703", "#FB8500", "#F15025"]
     fig = plt.figure()
     fig.set_figheight(3)
@@ -280,13 +312,16 @@ def plot_alignment(
     myhits.get_experiment_geant4_hits()
     # deconvolution steps
     deconvolver = Deconvolution(myhits, simulation_engine)
-
-    _, deconvoled_image, resampled_data, _ = deconvolver.deconvolve(
-        plot_deconvolved_heatmap=False,
-        plot_raw_heatmap=False,
-        downsample=pixels_downsample,
+    trim = 7
+    resample_n_pixels = 121
+    n_pixels = 256
+    deconvolver.deconvolve(
+        downsample=int((n_pixels - 2 * trim) / resample_n_pixels),
         trim=trim,
+        delta_decoding=False,
     )
+    resampled_data = deconvolver.raw_heatmap
+    deconvoled_image = deconvolver.deconvolved_image
 
     image = ax5.imshow(resampled_data.T, cmap=cmap, vmin=vmins[0], vmax=vmaxes[0])
     ax5.hlines(
@@ -296,27 +331,31 @@ def plot_alignment(
         np.arange(0, 120, 2), np.zeros(60), 120 * np.ones(60), linewidth=0.1, color="w"
     )
     ax5.set_title("simulated")
-
+    plt.clf()
+    fig = plt.figure()
+    fig.set_figheight(4)
+    fig.set_figwidth(4.5)
     xlist = np.linspace(0, 120, 121)
     ylist = np.linspace(0, 120, 121)
     X, Y = np.meshgrid(xlist, ylist)
-    cp = ax6.contour(
+    cp = plt.contour(
         X,
         Y,
         deconvoled_image / np.max(deconvoled_image),
         levels=[0.85, 1],
-        colors="#F15025",
+        colors="#EDF054",
     )
 
     import matplotlib.patches as mpatches
 
     contour_colors = ["#0091AC", "#D5573B", "#6F2DBD", "#9EF7F2"]
-    contour_colors = ["#023047", "#FFB703", "#219EBC", "#FB8500"]
+    contour_colors = ["#082E56", "#664396", "#B8627E", "#F1804E"]
+
     versions = ["V2", "V3", "V4", "V5"]
     all_patches = []
-    all_patches.append(mpatches.Patch(color="#F15025", label="sim"))
+    all_patches.append(mpatches.Patch(color="#EDF054", label="sim"))
     for i, cc in zip(range(4), contour_colors):
-        cp = ax6.contour(
+        cp = plt.contour(
             X,
             Y,
             deconvolved_images[i] / np.amax(deconvolved_images[i]),
@@ -326,18 +365,21 @@ def plot_alignment(
         mypatch = mpatches.Patch(color=cc, label=versions[i])
         all_patches.append(mypatch)
 
-    ax6.hlines(60, 0, 100, linewidth=0.1, color="grey", linestyles="--")
-    ax6.vlines(60, 0, 100, linewidth=0.1, color="grey", linestyles="--")
+    plt.hlines(60, 0, 100, linewidth=0.1, color="grey", linestyles="--")
+    plt.vlines(60, 0, 100, linewidth=0.1, color="grey", linestyles="--")
 
-    ax6.set_ylim([46, 76])
-    ax6.set_xlim([46, 76])
-    ax6.legend(handles=all_patches, loc="upper right")
+    plt.ylim([46, 76])
+    plt.xlim([46, 76])
+    plt.xlabel("pixel")
+    plt.ylabel("pixel")
+
+    plt.legend(handles=all_patches, loc="upper right")
 
     # using padding
     fig.tight_layout()
 
     plt.savefig(
-        "../experiment_results/%s.png" % save_name, dpi=500, bbox_inches="tight"
+        "../experiment_results/%s.png" % "alignment", dpi=500, bbox_inches="tight"
     )
     print(save_name)
     plt.clf()

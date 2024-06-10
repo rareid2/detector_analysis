@@ -7,6 +7,7 @@ from macros import find_disp_pos
 from scipy.optimize import minimize
 import numpy as np
 import os
+import copy
 
 # construct = CA and TD
 # source = DS and PS
@@ -23,7 +24,14 @@ def run_geom_corr(
     hitsonly=False,
     scale=None,
     data_folder=None,
+    distance=float,
+    n_elements_original=int,
+    det_size_cm=float,
+    pixel_mm=float,
+    sect=None,
+    energy_level_keV=float,
 ):
+    nthreads = 14
     if data_folder is None:
         data_folder = results_folder
 
@@ -37,17 +45,17 @@ def run_geom_corr(
         )
 
     # general detector design
-    det_size_cm = 4.941  # cm
-    pixel = 0.81  # mm
-    pixel_cm = pixel * 0.1
+    # det_size_cm = 4.94  # cm
+    # pixel = 1.26666667  # mm
+    pixel_cm = pixel_mm * 0.1
 
     # ---------- coded aperture set up ---------
     # set number of elements
-    n_elements_original = 61
-    multiplier = 1
+    # n_elements_original = 13
+    multiplier = 3
 
     # focal length
-    distance = 1.9764  # cm
+    # distance = 4.3  # cm
 
     # det_size_cm = 2.82 #4.984  # cm
     # pixel = 0.2 #0.186666667  # mm
@@ -59,7 +67,7 @@ def run_geom_corr(
     # n_elements_original = 47 #89
     # multiplier = 3
 
-    element_size = pixel * multiplier
+    element_size = pixel_mm * multiplier
     n_elements = (2 * n_elements_original) - 1
 
     mask_size = element_size * n_elements
@@ -69,7 +77,7 @@ def run_geom_corr(
 
     # thickness of mask
     det_thickness = 300  # um
-    thickness = 200  # um
+    thickness = 100  # um
 
     # focal length
     # distance = 2.2 # 4.49  # cm
@@ -125,7 +133,7 @@ def run_geom_corr(
 
     # --------------set up simulation---------------
     simulation_engine.set_config(
-        det1_thickness_um=300,
+        det1_thickness_um=det_thickness,
         det_gap_mm=30,  # gap between first and second (unused detector)
         win_thickness_um=100,  # window is not actually in there
         det_size_cm=det_size_cm,
@@ -140,7 +148,7 @@ def run_geom_corr(
 
     # --------------set up source---------------
     energy_type = "Mono"
-    energy_level = 0.235  # keV
+    energy_level = energy_level_keV  # keV
 
     # --------------set up data naming---------------
     if hitsonly:
@@ -173,11 +181,22 @@ def run_geom_corr(
         simulation_engine.run_simulation(fname, build=False, rename=True)
 
         # get the raw hits
-        myhits = Hits(fname=fname, experiment=False)
-        myhits.get_det_hits(
-            remove_secondaries=False, second_axis="y", energy_level=energy_level
-        )
-        hits_len = len(myhits.hits_dict["Position"])
+        for hi in range(nthreads):
+            print(hi)
+            fname_hits = fname[:-4] + "-{}.csv".format(hi)
+            myhits = Hits(fname=fname_hits, experiment=False, txt_file=txt)
+            hits_dict, sec_brehm, sec_e = myhits.get_det_hits(
+                remove_secondaries=True, second_axis="y"
+            )
+            if hi != 0:
+                # update fields in hits dict
+                myhits.hits_dict["Position"].extend(hits_copy.hits_dict["Position"])
+                myhits.hits_dict["Energy"].extend(hits_copy.hits_dict["Energy"])
+
+                hits_copy = copy.copy(myhits)
+            else:
+                hits_copy = copy.copy(myhits)
+            hits_len = len(myhits.hits_dict["Position"])
 
         # process them (txt file will be saved)
         deconvolver = Deconvolution(myhits, simulation_engine)
@@ -224,20 +243,26 @@ def run_geom_corr(
         # only getting raw hits
         if simulate:
             simulation_engine.run_simulation(fname, build=False, rename=True)
-            myhits = Hits(fname=fname, experiment=False)
-            myhits.get_det_hits(
-                remove_secondaries=True, second_axis="y", energy_level=energy_level
-            )
-            hits_len = len(myhits.hits_dict["Position"])
         if txt:
             myhits = Hits(fname=fname, experiment=False, txt_file=True)
             hits_len = np.sum(np.loadtxt(fname))
         else:
-            print("RE PROCESSING CSV")
-            myhits = Hits(fname=fname, experiment=False)
-            myhits.get_det_hits(
-                remove_secondaries=False, second_axis="y", energy_level=energy_level
-            )
+            print("PROCESSING CSV")
+            for hi in range(nthreads):
+                print(hi)
+                fname_hits = fname[:-4] + "-{}.csv".format(hi)
+                myhits = Hits(fname=fname_hits, experiment=False, txt_file=txt)
+                hits_dict, sec_brehm, sec_e = myhits.get_det_hits(
+                    remove_secondaries=False, second_axis="y"
+                )
+                if hi != 0:
+                    # update fields in hits dict
+                    myhits.hits_dict["Position"].extend(hits_copy.hits_dict["Position"])
+                    myhits.hits_dict["Energy"].extend(hits_copy.hits_dict["Energy"])
+
+                    hits_copy = copy.copy(myhits)
+                else:
+                    hits_copy = copy.copy(myhits)
             hits_len = len(myhits.hits_dict["Position"])
             deconvolver = Deconvolution(myhits, simulation_engine)
             deconvolver.deconvolve(
@@ -270,7 +295,9 @@ def run_geom_corr(
 
         if scale is None:
             scale = max_signal
-        fwhm = deconvolver.calculate_fwhm(direction, max_index_2d, scale=scale)
+        fwhm = deconvolver.calculate_fwhm(
+            direction, max_index_2d, scale=scale, sect=sect
+        )
         print(results_save)
 
         # print("Indices of the maximum value (2D):", max_index_2d)
@@ -284,10 +311,10 @@ def run_geom_corr(
 
 
 # -------- ------- SETUP -------- -------
-data_folder = "/home/rileyannereid/workspace/geant4/simulation-data/61-fwhm/"
-results_folder = "/home/rileyannereid/workspace/geant4/simulation-results/61-fwhm/"
+data_folder = "/home/rileyannereid/workspace/geant4/simulation-data/13-fwhm/"
+results_folder = "/home/rileyannereid/workspace/geant4/simulation-results/13-fwhm/"
 
-maxpixel = 61 // 2  # 71 #134
+maxpixel = 13 * 3 // 2  # 71 #134
 pix_int = 3  # 8
 incs = range(pix_int, maxpixel, pix_int)
 niter = 3
@@ -347,14 +374,14 @@ if step1:
             )
 
 # -------- ------- STEP 2 : get the deconvolved image with the mask to get the FWHM and signal -------- -------
-step2 = True
+step2 = False
 simulate = False
 txt = True
 hitsonly = False
+include_hits_effect = True
 
 scale = 1
 center_hits = None
-include_hits_effect = True
 
 if step2:
     for direction in ["0", "xy"]:
@@ -363,7 +390,7 @@ if step2:
         if direction != "0":
             if include_hits_effect:
                 hits = np.loadtxt(f"{results_folder}{direction}-hits.txt")
-            for ii, inc in enumerate(incs):
+            for ii, inc in enumerate(incs[:-1]):
                 if include_hits_effect:
                     hit_norm = hits[ii] / center_hits
                 else:

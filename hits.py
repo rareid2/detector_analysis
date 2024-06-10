@@ -1,8 +1,11 @@
 import os, math
 import pandas as pd
 import numpy as np
+import statistics
+from statistics import mode
 from experiment_engine import ExperimentEngine
 from uncertainty import add_uncertainty
+
 
 class Hits:
     def __init__(
@@ -44,7 +47,7 @@ class Hits:
                 round(100 * (experiment_engine.mask_detector_cm % 1)),
                 file_count,
             )
-            fname = f"cd109-test_{file_count:03d}.txt"
+            # fname = f"cd109-test_{file_count:03d}.txt"
             fname_full_path = os.path.join(experiment_engine.data_folder, fname)
             f = open(fname_full_path, "r")
 
@@ -96,18 +99,7 @@ class Hits:
             if nlines:
                 self.detector_hits = pd.read_csv(
                     self.fname,
-                    names=[
-                        "det",
-                        "x",
-                        "y",
-                        "z",
-                        "energy",
-                        "ID",
-                        "name",
-                        "x0",
-                        "y0",
-                        "z0",
-                    ],
+                    names=["det", "x", "y", "z", "energy", "ID", "name", "e0", "edep"],
                     dtype={
                         "det": np.int8,
                         "x": np.float64,
@@ -116,9 +108,8 @@ class Hits:
                         "energy": np.float64,
                         "ID": np.int8,
                         "name": str,
-                        "x0": np.float64,
-                        "y0": np.float64,
-                        "z0": np.float64,
+                        "e0": np.float64,
+                        "edep": np.float64,
                     },
                     delimiter=",",
                     on_bad_lines="skip",
@@ -137,9 +128,11 @@ class Hits:
                         "energy",
                         "ID",
                         "name",
-                        "x0",
-                        "y0",
-                        "z0",
+                        "e0",
+                        "edep",
+                        "vx",
+                        "vy",
+                        "vz",
                     ],
                     dtype={
                         "det": np.int8,
@@ -149,9 +142,11 @@ class Hits:
                         "energy": np.float64,
                         "ID": np.int8,
                         "name": str,
-                        "x0": np.float64,
-                        "y0": np.float64,
-                        "z0": np.float64,
+                        "e0": np.float64,
+                        "edep": np.float64,
+                        "vx": np.float64,
+                        "vy": np.float64,
+                        "vz": np.float64,
                     },
                     delimiter=",",
                     on_bad_lines="skip",
@@ -159,8 +154,8 @@ class Hits:
                 )
             self.n_entries = len(self.detector_hits["det"])
 
-        if self.n_entries == 0:
-            raise ValueError("No particles hits on any detector!")
+        # if self.n_entries == 0:
+        #    raise ValueError("No particles hits on any detector!")
 
         self.hits_dict = {}
 
@@ -248,8 +243,7 @@ class Hits:
         self,
         remove_secondaries: bool = False,
         second_axis: str = "y",
-        energy_level: float = 500,
-        energy_bin=None,
+        det_thick_cm=0.03,
     ) -> dict:
         """
         return a dictionary containing hits on front detector
@@ -262,129 +256,133 @@ class Hits:
         posX = []
         posY = []
         energies = []
-        vertex = []
-        detector_offset = 1111 * 0.45 - (0.03 / 2)  # TODO: make this dynamic
+        e0s = []
+        edeps = []
+        vpos = []
+        pids = []
+        names = []
+
+        det_size = det_thick_cm
+        detector_offset_init = round(
+            1111 * 0.45 - (det_size / 2), 3
+        )  # TODO: make this dynamic
+
+        # check corret offest
+        zps = []
+        for count, el in enumerate(self.detector_hits["det"][:200]):
+            if el == 1:
+                if self.detector_hits["ID"][count] == 0:
+                    zpos = self.detector_hits["z"][count]
+                    zps.append(zpos)
+        try:
+            detector_offset = mode(zps)
+        except:
+            detector_offset = detector_offset_init
+
+        if np.abs(detector_offset - detector_offset_init) > 0.002:
+            detector_offset = detector_offset_init
 
         secondary_e = 0
         secondary_gamma = 0
+        skip_next_line = False
 
         for count, el in enumerate(self.detector_hits["det"]):
-            # only get hits on the first detector
-            if el == 1 and remove_secondaries != True:
-                xpos = self.detector_hits["x"][count]
-                ypos = self.detector_hits["y"][count]
-                zpos = self.detector_hits["z"][count]
-                energy_keV = self.detector_hits["energy"][count]
+            if el != 1:
+                print("ERRORRRRR not first detector????")
+                continue
 
-                if energy_bin is not None:
-                    if energy_bin[0] < energy_keV < energy_bin[1]:
-                        pass
-                    else:
-                        continue
+            # if not processing secondaries, remove it
+            if self.detector_hits["ID"][count] != 0:
+                if remove_secondaries:
+                    skip_next_line = False
+                    continue
                 else:
-                    pass
-
-                if second_axis == "z" and ypos == 0.015:
-                    posX.append(xpos)
-                    posY.append(zpos - detector_offset)
-                    energies.append(energy_keV)
-                    vertex.append(
-                        np.array(
-                            [
-                                self.detector_hits["x0"][count],
-                                self.detector_hits["y0"][count],
-                                self.detector_hits["z0"][count],
-                            ]
-                        )
-                    )
-                    # add to secondary count -- anything NOT parent
-                    if self.detector_hits["ID"][count] != 0:
+                    if self.detector_hits["z"][count] == detector_offset:
                         if self.detector_hits["name"][count] == "e-":
                             secondary_e += 1
                         else:
                             secondary_gamma += 1
-                elif second_axis == "y" and zpos == detector_offset:
+
+            # get particle attributes
+            xpos = self.detector_hits["x"][count]
+            ypos = self.detector_hits["y"][count]
+            zpos = self.detector_hits["z"][count]
+            energy_keV = self.detector_hits["energy"][count]
+            e0 = self.detector_hits["e0"][count]
+            edep = self.detector_hits["edep"][count]
+            pid = self.detector_hits["ID"][count]
+            pname = self.detector_hits["name"][count]
+
+            if skip_next_line:
+                skip_next_line = False
+                continue
+            else:
+                if zpos == detector_offset:
+                    # if group of 3 primaries (weird bug?)
+                    if count > 1:
+                        if (
+                            xpos - 0.00001
+                            <= self.detector_hits["x"][count - 1]
+                            <= xpos + 0.00001
+                            and xpos - 0.00001
+                            <= self.detector_hits["x"][count - 2]
+                            <= xpos + 0.00001
+                        ):
+                            skip_next_line = False
+                            continue
+
+                    if count == len(self.detector_hits) - 1:
+                        # shouldnt happen
+                        continue
+                    # came in front of detector, record position
                     posX.append(xpos)
                     posY.append(ypos)
-                    energies.append(energy_keV)
-                    vertex.append(
-                        np.array(
-                            [
-                                self.detector_hits["x0"][count],
-                                self.detector_hits["y0"][count],
-                                self.detector_hits["z0"][count],
-                            ]
-                        )
+                    vpos.append(
+                        [
+                            self.detector_hits["vx"][count],
+                            self.detector_hits["vy"][count],
+                            self.detector_hits["vz"][count],
+                        ]
                     )
-                    # add to secondary count -- anything NOT parent
-                    if self.detector_hits["ID"][count] != 0:
-                        if self.detector_hits["name"][count] == "e-":
-                            secondary_e += 1
-                        else:
-                            secondary_gamma += 1
-                else:
-                    pass
 
-            # if checking for secondaries and want to remove them, only process electrons
-            elif el == 1 and remove_secondaries:
-                if (
-                    self.detector_hits["ID"][count] == 0
-                    and self.detector_hits["name"][count] == "e-"
-                ):
-                    xpos = self.detector_hits["x"][count]
-                    ypos = self.detector_hits["y"][count]
-                    zpos = self.detector_hits["z"][count]
-                    energy_keV = self.detector_hits["energy"][count]
+                    if (
+                        remove_secondaries != True
+                        and self.detector_hits["ID"][count] != 0
+                        and self.detector_hits["ID"][count + 1] == 0
+                    ):
+                        # secondaries can be created inside the detector and leave
+                        # check if this is a secondary, but the next line is not
+                        skip_next_line = False
+                        # edep is just edep
 
-                    if energy_bin is not None:
-                        if energy_bin[0] < energy_keV < energy_bin[1]:
-                            pass
-                        else:
-                            continue
+                    elif self.detector_hits["energy"][count + 1] != 0:
+                        # e dep is the energy diff between steps
+                        edep = energy_keV - self.detector_hits["energy"][count + 1]
+                        skip_next_line = True
+                    elif self.detector_hits["energy"][count + 1] == 0:
+                        # particle died
+                        edep = energy_keV
+                        skip_next_line = True
                     else:
-                        if (
-                            energy_level - energy_level * 0.05
-                            < energy_keV
-                            < energy_level * 0.05 + energy_level
-                        ):
-                            pass
-                        else:
-                            continue
+                        print("THERES AN ISSUE")
+                        skip_next_line = True
 
-                    if second_axis == "z" and ypos == 0.015:
-                        posX.append(xpos)
-                        posY.append(zpos - detector_offset)
-                        energies.append(energy_keV)
-                        vertex.append(
-                            np.array(
-                                [
-                                    self.detector_hits["x0"][count],
-                                    self.detector_hits["y0"][count],
-                                    self.detector_hits["z0"][count],
-                                ]
-                            )
-                        )
-                    elif second_axis == "y" and zpos == detector_offset:
-                        posX.append(xpos)
-                        posY.append(ypos)
-                        energies.append(energy_keV)
-                        vertex.append(
-                            np.array(
-                                [
-                                    self.detector_hits["x0"][count],
-                                    self.detector_hits["y0"][count],
-                                    self.detector_hits["z0"][count],
-                                ]
-                            )
-                        )
-                    else:
-                        pass
-            else:
-                pass
+                    energies.append(energy_keV)
+                    e0s.append(e0)
+                    edeps.append(edep)
+                    pids.append(pid)
+                    names.append(pname)
 
         hits_pos = [(X, Y) for X, Y in zip(posX, posY)]
-
-        hits_dict = {"Position": hits_pos, "Energy": energies, "Vertices": vertex}
+        hits_dict = {
+            "Position": hits_pos,
+            "Energy": energies,
+            "E0": e0s,
+            "Edep": edeps,
+            "Vert": vpos,
+            "ID": pids,
+            "name": names,
+        }
 
         self.hits_dict = hits_dict
 

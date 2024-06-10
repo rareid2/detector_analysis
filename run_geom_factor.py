@@ -7,6 +7,7 @@ from macros import find_disp_pos
 import numpy as np
 import os
 import subprocess
+import copy
 
 from scipy.io import savemat
 from itertools import cycle
@@ -21,18 +22,19 @@ simulation_engine = SimulationEngine(construct="CA", source="PS", write_files=Tr
 
 txt = False
 simulate = True
+nthreads = 14
 
 trim = None
 mosaic = True
 multiplier = 1
 
 # designs to evaluate
-det_size_cms = [4.945]  # cm
-pixels = [1.15]  # mm
-n_elements_originals = [43]
-thicknesses = [200]
-distances = [1.978]
-radii = [7.2]
+det_size_cms = [4.94]  # cm
+pixels = [3.8]  # mm
+n_elements_originals = [13]
+thicknesses = [100]
+distances = [4.3]
+radii = [7.3]
 i = 0
 
 energies = [0.235]
@@ -97,11 +99,24 @@ for energy in energies:
         simulation_engine.run_simulation(fname, build=False, rename=True)
 
     # ---------- process results -----------
-    myhits = Hits(fname=fname, experiment=False, txt_file=txt)
     if not txt:
-        myhits.get_det_hits(
-            remove_secondaries=False, second_axis="y", energy_level=energy_level
-        )
+        for hi in range(nthreads):
+            print(hi)
+            fname_hits = fname[:-4] + "-{}.csv".format(hi)
+            myhits = Hits(fname=fname_hits, experiment=False, txt_file=txt)
+            hits_dict, sec_brehm, sec_e = myhits.get_det_hits(
+                remove_secondaries=True, second_axis="y", det_thick_cm=0.03
+            )
+            if hi != 0:
+                # update fields in hits dict
+                myhits.hits_dict["Position"].extend(hits_copy.hits_dict["Position"])
+                myhits.hits_dict["Energy"].extend(hits_copy.hits_dict["Energy"])
+
+                hits_copy = copy.copy(myhits)
+            else:
+                hits_copy = copy.copy(myhits)
+    else:
+        myhits = Hits(fname=fname, experiment=False, txt_file=txt)
 
     # directory to save results in
     results_dir = "../simulation-results/geom-factor/"

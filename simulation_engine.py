@@ -113,6 +113,7 @@ class SimulationEngine:
         mosaic: bool = True,
         mask_size: float = None,
         radius_cm: float = None,
+        vol_name: float = None,
     ) -> None:
         """
         sets all the config parameters based on sim type and writes them if option selected
@@ -164,6 +165,7 @@ class SimulationEngine:
                     mask_size_mm=self.mask_size,
                     aperture_filename=self.aperture_filename,
                     radius_cm=radius_cm,
+                    vol_name=vol_name,
                 )
 
         return
@@ -182,7 +184,10 @@ class SimulationEngine:
         confine: bool = False,
         detector_dim: float = 1.408,
         theta: float = None,
+        theta_lower: float = None,
         ring: float = False,
+        plane_size_cm: float = None,
+        sphere_center: float = None,
     ) -> None:
         """
         create macro file based on simulation type -- see macros.py for function defs
@@ -225,10 +230,13 @@ class SimulationEngine:
                     progress_mod=progress_mod,
                     fname_tag=fname_tag,
                     theta=theta,
+                    theta_lower=theta_lower,
                     ca_pos=ca_pos,
                     confine=confine,
                     world_offset=self.world_offset,
                     ring=ring,
+                    plane_size_cm=plane_size_cm,
+                    sphere_center=sphere_center,
                 )
             elif self.construct == "CA" and self.source == "PS" and surface == False:
                 macro_file = write_pt_macro(
@@ -264,7 +272,7 @@ class SimulationEngine:
             fname: new data file name and location
         returns:
         """
-        folder_path = '../simulation-data/'
+        folder_path = "../simulation-data/"
         file_list = os.listdir(folder_path)
 
         for file_name in file_list:
@@ -273,9 +281,9 @@ class SimulationEngine:
                 # Extract the integer part from the original file name
                 try:
                     integer_part = int(file_name[5:-4])
-                    
+
                     # Construct the new file name with the custom string and the same integer
-                    new_file_name = f'{fname[:-4]}-{integer_part}.csv'
+                    new_file_name = f"{fname[:-4]}-{integer_part}.csv"
 
                     # Build the full paths for old and new file names
                     old_file_path = os.path.join(folder_path, file_name)
@@ -283,10 +291,10 @@ class SimulationEngine:
 
                     # Rename the file
                     os.rename(old_file_path, new_file_path)
-                    print(f'Renamed: {file_name} to {new_file_name}')
+                    print(f"Renamed: {file_name} to {new_file_name}")
                 except ValueError:
                     # Ignore files that do not have a valid integer part
-                    print(f'Ignored: {file_name} (Invalid integer part)')
+                    print(f"Ignored: {file_name} (Invalid integer part)")
 
         return
 

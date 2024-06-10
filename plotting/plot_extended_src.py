@@ -66,7 +66,7 @@ gf_grid = 18 * fwhm_grid / np.sum(fwhm_grid)
 for i, n in enumerate(n_p):
     for j, theta in enumerate(thetas):
         n_particles = int((n * (5.265 * 2) ** 2) * (1 - np.cos(np.deg2rad(theta))))
-
+        print(n / 1e6, theta, "simulated", n_particles / 1e5)
         formatted_theta = "{:.0f}p{:02d}".format(int(theta), int((theta % 1) * 100))
         data = load_data(
             f"/home/rileyannereid/workspace/geant4/simulation-results/rings/59-3.47-{formatted_theta}-deg_{n_particles:.2E}_Mono_500_dc.txt"
@@ -96,7 +96,7 @@ for i, n in enumerate(n_p):
                 angle = np.arctan(aa / distance)
                 angle = np.rad2deg(angle)
 
-                if angle < (theta + 0.5):
+                if angle < (theta + 2):
 
                     total_signal += data[y, x]
                     # signal_count += 1
@@ -104,8 +104,9 @@ for i, n in enumerate(n_p):
 
         # px_factor = 18*signal_count / (pixel_count**2)
         # print("recorded flux", total_signal)
-        print(i, theta)
-        print(total_signal / signal_count)
+        # print(i, theta)
+        print("RECORDED PARTICLES", (n_particles - total_signal) / n_particles)
+        print("ESTIMATED FLUX", total_signal / signal_count)
         # Plot heatmap
         im = axs[j, i].imshow(data / 18, cmap=cmap)
 

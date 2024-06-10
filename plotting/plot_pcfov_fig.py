@@ -74,7 +74,7 @@ def fcfov_plane(
 
 
 n_particles_frac = np.logspace(0, -2, 8)
-npf = n_particles_frac[5]
+npf = n_particles_frac[1]  # used 1 in the paper
 print(npf / n_particles_frac[1])
 n_particles = (
     int((8e7 * (5.030 * 2) ** 2) * (np.cos(np.deg2rad(45)) - np.cos(np.deg2rad(70))))
